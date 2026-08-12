@@ -1,8 +1,9 @@
 # local working docs
 docs/PLAN.md
 
-# licensed data — MUST NOT be committed
-data/ldc/
+# licensed data — MUST NOT be committed (README documents the directory, nothing else)
+data/ldc/*
+!data/ldc/README.md
 
 # python
 __pycache__/
@@ -10,6 +11,8 @@ __pycache__/
 .venv/
 venv/
 *.egg-info/
+build/
+dist/
 .pytest_cache/
 .ruff_cache/
 
