@@ -198,6 +198,9 @@ class Token(BaseModel):
 
     head: int | None = Field(default=None, ge=ROOT_HEAD)
     parser_label: str | None = None
+    arc_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    """How sure the parser was of *this attachment*. Raw evidence for the
+    combined `confidence` below, never a substitute for it."""
 
     irab_role: str | None = None
     rule_id: str | None = None
