@@ -46,7 +46,8 @@ quote-style = "double"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q --strict-markers"
+addopts = "-q --strict-markers -m 'not camel'"
 markers = [
     "ldc: requires licensed PADT data under data/ldc/ (not in version control)",
+    "camel: loads a live CAMeL model; deselected by default, run with `-m camel`",
 ]

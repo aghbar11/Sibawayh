@@ -78,13 +78,18 @@ class Voice(StrEnum):
 class Gender(StrEnum):
     M = "m"
     F = "f"
+    BOTH = "b"
+    """Valid as either gender — CAMeL `gen=b`, e.g. a participle unmarked for gender."""
     NULL = "null"
+    UNKNOWN = "unknown"
 
 
 class Number(StrEnum):
     S = "s"
     D = "d"
     P = "p"
+    BOTH = "b"
+    """Valid as either number — CAMeL `num=b`."""
     NULL = "null"
     UNKNOWN = "unknown"
 
