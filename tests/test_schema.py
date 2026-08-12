@@ -21,17 +21,12 @@ from sibawayh.schema import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-EVAL_CANDIDATES = [
-    REPO_ROOT / "data" / "eval" / "sentences.json",
-    REPO_ROOT / "docs" / "eval" / "sentences.json",
-]
+EVAL_PATH = REPO_ROOT / "data" / "eval" / "sentences.json"
 
 
 def _load_eval() -> list[dict[str, Any]]:
-    for path in EVAL_CANDIDATES:
-        if path.is_file():
-            return json.loads(path.read_text(encoding="utf-8"))["sentences"]
-    pytest.skip(f"eval set not found at any of {[str(p) for p in EVAL_CANDIDATES]}")
+    # The eval set is the spec; a missing file is a broken checkout, not a reason to skip.
+    return json.loads(EVAL_PATH.read_text(encoding="utf-8"))["sentences"]
 
 
 EVAL_SENTENCES = _load_eval()
