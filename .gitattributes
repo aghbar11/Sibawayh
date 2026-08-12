@@ -1,0 +1,6 @@
+﻿* text=auto eol=lf
+*.json text eol=lf
+*.conll text eol=lf
+*.conllu text eol=lf
+*.png binary
+*.tgz binary

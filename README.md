@@ -8,7 +8,7 @@ Register: Modern Standard Arabic.
 ## Layout
 
 ```
-irab/
+sibawayh/
   normalize.py   orthographic normalization
   morphology.py  CAMeL Tools wrapper — the only module that knows CAMeL's feature codes
   parsers/       parser backends behind one interface (licensing firewall)
