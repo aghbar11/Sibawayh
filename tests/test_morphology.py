@@ -36,6 +36,7 @@ from sibawayh.morphology import (
     translate_features,
     translate_pos,
 )
+from sibawayh.normalize import strip_diacritics
 from sibawayh.schema import Case, Gender, Number, Pos, Sentence, Source, State, Voice
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -308,6 +309,25 @@ def test_joined_pronoun_carries_its_role_and_features() -> None:
     assert pronoun.feats.case == Case.GEN
     assert pronoun.feats.model_extra == {"clitic_role": "poss"}
     assert sentence.tokens[1].feats.state == State.CONSTRUCT
+
+
+@pytest.mark.parametrize("sentence_id", sorted(RECORDED), ids=sorted(RECORDED))
+def test_form_is_bare_and_diac_is_vowelled(sentence_id: str) -> None:
+    """`form` is the word as typed, `diac` is CAMeL's vowelling of it. Stripping
+    the marks off `diac` must land exactly on `form`, or the two have drifted
+    apart and the student is shown a word nobody wrote."""
+    for token in build(sentence_id).tokens:
+        assert token.form == strip_diacritics(token.form)
+        if token.diac is not None:
+            assert strip_diacritics(token.diac) == token.form
+
+
+def test_backoff_analysis_leaves_diac_empty() -> None:
+    """CAMeL guessed; it has no diacritization to offer. Echoing the bare surface
+    into `diac` would present a guess as a vowelling."""
+    unanalyzed = build("interrogative_hamza").tokens[0]
+    assert unanalyzed.form == RECORDED["interrogative_hamza"]["words"][0]["word"]
+    assert unanalyzed.diac is None
 
 
 def test_backoff_analysis_falls_back_to_the_surface_word() -> None:

@@ -40,7 +40,7 @@ import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from sibawayh.normalize import normalize
+from sibawayh.normalize import normalize, strip_diacritics
 from sibawayh.schema import (
     Analysis,
     Aspect,
@@ -352,8 +352,11 @@ def _enclitic_codes(analysis: Mapping[str, Any]) -> list[str]:
     return [] if code is None or code in NO_CLITIC else [code]
 
 
-def _clitic_token(token_id: int, form: str, code: str) -> Token:
+def _clitic_token(token_id: int, diac: str, code: str) -> Token:
     """A token for one clitic, typed from its feature code.
+
+    `diac` is the segment as CAMeL wrote it, diacritics and all; `form` is that
+    segment bare, because `form` is what the student typed.
 
     A joined pronoun carries the person/gender/number its `enc0` code spells out,
     and the case that follows from its role: مضاف إليه is genitive, مفعول به is
@@ -361,6 +364,7 @@ def _clitic_token(token_id: int, form: str, code: str) -> Token:
     `unknown`, because which case it takes depends on the governor, and that is
     the rule engine's call.
     """
+    form = strip_diacritics(diac)
     match = _ENCLITIC_PRONOUN.match(code)
     if match is not None:
         role = match.group("role")
@@ -375,22 +379,22 @@ def _clitic_token(token_id: int, form: str, code: str) -> Token:
         return Token(
             id=token_id,
             form=form,
-            diac=form,
+            diac=diac,
             pos=Pos.PRON,
             pos_fine="pron",
             feats=feats,
-            provenance={"form": Source.CAMEL, "pos": Source.CAMEL, "feats": Source.CAMEL},
+            provenance={"diac": Source.CAMEL, "pos": Source.CAMEL, "feats": Source.CAMEL},
         )
 
     pos, pos_fine = _lookup(CLITIC_POS, code, "clitic")
     return Token(
         id=token_id,
         form=form,
-        diac=form,
-        lemma=form,
+        diac=diac,
+        lemma=diac,
         pos=pos,
         pos_fine=pos_fine,
-        provenance={"form": Source.CAMEL, "pos": Source.CAMEL},
+        provenance={"diac": Source.CAMEL, "pos": Source.CAMEL},
     )
 
 
@@ -405,14 +409,17 @@ def _segment(word: str, top: Mapping[str, Any]) -> tuple[list[Clitic], str, list
     them — its surface is folded back onto the stem, because `Al_det` is a
     feature and the student sees الكتاب as one word.
 
-    Falls back to the whole word, unsegmented, when CAMeL gave a backoff analysis
-    or when `d3tok` and the `prc*`/`enc0` fields disagree about how many clitics
-    there are. Guessing an alignment there would attach the wrong role to the
-    wrong piece.
+    The stem comes back diacritized, or as `""` when CAMeL produced no reading at
+    all — a backoff analysis has no diacritization to offer, and inventing one
+    would be a claim we cannot support. The caller falls back to the surface word.
+
+    Segmentation is skipped, whole word kept, in two cases: a backoff analysis, and
+    `d3tok` disagreeing with the `prc*`/`enc0` fields about how many clitics there
+    are. Guessing an alignment there would attach the wrong role to the wrong piece.
     """
     d3tok = top.get("d3tok") or ""
     if not d3tok or d3tok == NO_ANALYSIS:
-        return [], word, []
+        return [], "", []
 
     proclitic_forms, stem, enclitic_forms = _split_d3tok(d3tok)
     proclitic_codes = _proclitic_codes(top)
@@ -448,17 +455,20 @@ def tokens_from_word(
         raise MorphologyError(f"word {word!r} has no analyses")
 
     top, _ = analyses[0]
-    proclitics, stem_form, enclitics = _segment(word, top)
+    proclitics, stem_diac, enclitics = _segment(word, top)
 
     tokens = [
-        _clitic_token(start_id + offset, form, code)
-        for offset, (form, code) in enumerate(proclitics)
+        _clitic_token(start_id + offset, diac, code)
+        for offset, (diac, code) in enumerate(proclitics)
     ]
 
     stem = Token(
         id=start_id + len(tokens),
-        form=stem_form,
-        diac=stem_form,
+        # `form` is the word as typed, `diac` is CAMeL's diacritization of it. On a
+        # backoff analysis there is no diacritization, and `diac` stays empty rather
+        # than echoing the surface back as though it had been vowelled.
+        form=strip_diacritics(stem_diac) or word,
+        diac=stem_diac or None,
         lemma=top.get("lex"),
         root=top.get("root"),
         pos=translate_pos(top["pos"]),
@@ -480,8 +490,8 @@ def tokens_from_word(
     tokens.append(stem)
 
     tokens.extend(
-        _clitic_token(stem.id + 1 + offset, form, code)
-        for offset, (form, code) in enumerate(enclitics)
+        _clitic_token(stem.id + 1 + offset, diac, code)
+        for offset, (diac, code) in enumerate(enclitics)
     )
     return tokens
 
