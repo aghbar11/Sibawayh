@@ -1,0 +1,291 @@
+{
+  "$comment": "data/eval/sentences.json — hand-verified gold analyses. This file IS the spec. head=0 means ROOT. Exactly one token per sentence has head=0.",
+  "schema_version": 1,
+  "sentences": [
+    {
+      "id": "verbal_overt_agent_01",
+      "sentence": "يأكل الرجل السمك",
+      "category": "verbal",
+      "tier": 1,
+      "tokens": [
+        {"id": 1, "form": "يأكل", "diac": "يَأْكُلُ", "lemma": "أَكَل", "pos": "verb",
+         "feats": {"mood": "indicative", "voice": "active", "person": 3, "gen": "m", "num": "s"},
+         "head": 0, "irab_role": "فعل مضارع مرفوع",
+         "evidence": ["sentence_initial", "pos=verb"]},
+        {"id": 2, "form": "الرجل", "diac": "الرَّجُلُ", "lemma": "رَجُل", "pos": "noun",
+         "feats": {"case": "nom", "state": "def", "gen": "m", "num": "s"},
+         "head": 1, "irab_role": "فاعل",
+         "evidence": ["case=nom", "head_pos=verb", "follows_verb"]},
+        {"id": 3, "form": "السمك", "diac": "السَّمَكَ", "lemma": "سَمَك", "pos": "noun",
+         "feats": {"case": "acc", "state": "def", "gen": "m", "num": "s"},
+         "head": 1, "irab_role": "مفعول به",
+         "evidence": ["case=acc", "head_pos=verb"]}
+      ],
+      "notes": "Baseline verbal sentence (I3rab paper Table 1). One governor, two governed."
+    },
+
+    {
+      "id": "verbal_perfect_01",
+      "sentence": "كتب الطالب المقالة",
+      "category": "verbal",
+      "tier": 1,
+      "tokens": [
+        {"id": 1, "form": "كتب", "diac": "كَتَبَ", "lemma": "كَتَب", "pos": "verb",
+         "feats": {"aspect": "perfect", "voice": "active", "person": 3, "gen": "m", "num": "s"},
+         "head": 0, "irab_role": "فعل ماضٍ",
+         "evidence": ["sentence_initial", "pos=verb"]},
+        {"id": 2, "form": "الطالب", "diac": "الطالِبُ", "lemma": "طالِب", "pos": "noun",
+         "feats": {"case": "nom", "state": "def", "gen": "m", "num": "s"},
+         "head": 1, "irab_role": "فاعل",
+         "evidence": ["case=nom", "head_pos=verb", "follows_verb"]},
+        {"id": 3, "form": "المقالة", "diac": "المَقالَةَ", "lemma": "مَقالَة", "pos": "noun",
+         "feats": {"case": "acc", "state": "def", "gen": "f", "num": "s"},
+         "head": 1, "irab_role": "مفعول به",
+         "evidence": ["case=acc", "head_pos=verb"]}
+      ],
+      "notes": "Perfect verb. Tests that aspect does not change tree shape."
+    },
+
+    {
+      "id": "verbal_passive_01",
+      "sentence": "كتبت المقالة",
+      "category": "verbal_passive",
+      "tier": 1,
+      "tokens": [
+        {"id": 1, "form": "كتبت", "diac": "كُتِبَتْ", "lemma": "كَتَب", "pos": "verb",
+         "feats": {"aspect": "perfect", "voice": "passive", "person": 3, "gen": "f", "num": "s"},
+         "head": 0, "irab_role": "فعل ماضٍ مبني للمجهول",
+         "evidence": ["sentence_initial", "pos=verb", "voice=passive"]},
+        {"id": 2, "form": "المقالة", "diac": "المَقالَةُ", "lemma": "مَقالَة", "pos": "noun",
+         "feats": {"case": "nom", "state": "def", "gen": "f", "num": "s"},
+         "head": 1, "irab_role": "نائب فاعل",
+         "evidence": ["case=nom", "head_pos=verb", "head_voice=passive"]}
+      ],
+      "notes": "Passive: the nominative is نائب فاعل, not فاعل. Voice on the head is the discriminator."
+    },
+
+    {
+      "id": "nominal_single_predicate_01",
+      "sentence": "الشمس مشرقة",
+      "category": "nominal_predicate_single",
+      "tier": 1,
+      "tokens": [
+        {"id": 1, "form": "الشمس", "diac": "الشَّمْسُ", "lemma": "شَمْس", "pos": "noun",
+         "feats": {"case": "nom", "state": "def", "gen": "f", "num": "s"},
+         "head": 0, "irab_role": "مبتدأ",
+         "evidence": ["sentence_initial", "pos=noun", "case=nom"]},
+        {"id": 2, "form": "مشرقة", "diac": "مُشْرِقَةٌ", "lemma": "مُشْرِق", "pos": "adj",
+         "feats": {"case": "nom", "state": "indef", "gen": "f", "num": "s"},
+         "head": 1, "irab_role": "خبر",
+         "evidence": ["case=nom", "head_is_topic", "no_verb_in_sentence"]}
+      ],
+      "notes": "Pure nominal sentence (I3rab Table 3). Topic is the main word; predicate hangs off it."
+    },
+
+    {
+      "id": "nominal_pp_predicate_01",
+      "sentence": "العصفور في القفص",
+      "category": "nominal_predicate_prepositional",
+      "tier": 1,
+      "tokens": [
+        {"id": 1, "form": "العصفور", "diac": "العُصْفُورُ", "lemma": "عُصْفُور", "pos": "noun",
+         "feats": {"case": "nom", "state": "def", "gen": "m", "num": "s"},
+         "head": 0, "irab_role": "مبتدأ",
+         "evidence": ["sentence_initial", "pos=noun", "case=nom"]},
+        {"id": 2, "form": "في", "diac": "في", "lemma": "في", "pos": "prep",
+         "head": 1, "irab_role": "حرف جر — خبر شبه جملة",
+         "evidence": ["head_is_topic", "pos=prep", "predicate_position"]},
+        {"id": 3, "form": "القفص", "diac": "القَفَصِ", "lemma": "قَفَص", "pos": "noun",
+         "feats": {"case": "gen", "state": "def", "gen": "m", "num": "s"},
+         "head": 2, "irab_role": "مجرور",
+         "evidence": ["case=gen", "head_pos=prep"]}
+      ],
+      "notes": "Preposition is the head of its object (عامل) and attaches to the topic as شبه جملة. UD would invert this arc."
+    },
+
+    {
+      "id": "nominal_adv_predicate_01",
+      "sentence": "الكتاب فوق الطاولة",
+      "category": "nominal_predicate_adverbial",
+      "tier": 1,
+      "tokens": [
+        {"id": 1, "form": "الكتاب", "diac": "الكِتابُ", "lemma": "كِتاب", "pos": "noun",
+         "feats": {"case": "nom", "state": "def", "gen": "m", "num": "s"},
+         "head": 0, "irab_role": "مبتدأ",
+         "evidence": ["sentence_initial", "pos=noun", "case=nom"]},
+        {"id": 2, "form": "فوق", "diac": "فَوْقَ", "lemma": "فَوْق", "pos": "noun",
+         "feats": {"case": "acc", "state": "construct"},
+         "head": 1, "irab_role": "ظرف مكان — خبر شبه جملة",
+         "evidence": ["head_is_topic", "adverbial", "state=construct"]},
+        {"id": 3, "form": "الطاولة", "diac": "الطَّاوِلَةِ", "lemma": "طاوِلَة", "pos": "noun",
+         "feats": {"case": "gen", "state": "def", "gen": "f", "num": "s"},
+         "head": 2, "irab_role": "مضاف إليه",
+         "evidence": ["case=gen", "head_state=construct"]}
+      ],
+      "notes": "Adverbial predicate. فوق is منصوب on adverbiality and governs a genitive as مضاف."
+    },
+
+    {
+      "id": "nominal_verbal_predicate_01",
+      "sentence": "محمد يقرأ الكتاب",
+      "category": "nominal_predicate_verbal",
+      "tier": 1,
+      "tokens": [
+        {"id": 1, "form": "محمد", "diac": "مُحَمَّدٌ", "lemma": "مُحَمَّد", "pos": "propn",
+         "feats": {"case": "nom", "state": "indef", "gen": "m", "num": "s"},
+         "head": 0, "irab_role": "مبتدأ",
+         "evidence": ["sentence_initial", "pos=noun", "case=nom"]},
+        {"id": 2, "form": "يقرأ", "diac": "يَقْرَأُ", "lemma": "قَرَأ", "pos": "verb",
+         "feats": {"mood": "indicative", "voice": "active", "person": 3, "gen": "m", "num": "s"},
+         "head": 1, "irab_role": "خبر — جملة فعلية",
+         "evidence": ["head_is_topic", "verbal_sentence_as_predicate"]},
+        {"id": 3, "form": "هو*", "pos": "pron", "inserted": true,
+         "feats": {"person": 3, "gen": "m", "num": "s", "case": "nom"},
+         "head": 2, "irab_role": "فاعل — ضمير مستتر",
+         "evidence": ["verb_has_no_overt_agent", "features_copied_from_verb"]},
+        {"id": 4, "form": "الكتاب", "diac": "الكِتابَ", "lemma": "كِتاب", "pos": "noun",
+         "feats": {"case": "acc", "state": "def", "gen": "m", "num": "s"},
+         "head": 2, "irab_role": "مفعول به",
+         "evidence": ["case=acc", "head_pos=verb"]}
+      ],
+      "notes": "CRITICAL CASE. Sentence starts with a noun so it is nominal, root is المبتدأ — not the verb. Token 3 is INSERTED by us; no parser produces it. Insertion shifts subsequent ids."
+    },
+
+    {
+      "id": "nasikh_kana_01",
+      "sentence": "كان اليوم رائعا",
+      "category": "nawasikh_kana",
+      "tier": 1,
+      "tokens": [
+        {"id": 1, "form": "كان", "diac": "كانَ", "lemma": "كان", "pos": "verb",
+         "feats": {"aspect": "perfect", "defective": true},
+         "head": 0, "irab_role": "فعل ماضٍ ناقص",
+         "evidence": ["sentence_initial", "lemma_in_kana_sisters"]},
+        {"id": 2, "form": "اليوم", "diac": "اليَوْمُ", "lemma": "يَوْم", "pos": "noun",
+         "feats": {"case": "nom", "state": "def", "gen": "m", "num": "s"},
+         "head": 1, "irab_role": "اسم كان",
+         "evidence": ["case=nom", "head_lemma_in_kana_sisters"]},
+        {"id": 3, "form": "رائعا", "diac": "رائِعاً", "lemma": "رائِع", "pos": "adj",
+         "feats": {"case": "acc", "state": "indef", "gen": "m", "num": "s"},
+         "head": 1, "irab_role": "خبر كان",
+         "evidence": ["case=acc", "head_lemma_in_kana_sisters"]}
+      ],
+      "notes": "كان keeps the topic مرفوع and makes the predicate منصوب. Both attach to كان. Case is the discriminator."
+    },
+
+    {
+      "id": "nasikh_inna_01",
+      "sentence": "إن العراقيين قادرون",
+      "category": "nawasikh_inna",
+      "tier": 1,
+      "tokens": [
+        {"id": 1, "form": "إن", "diac": "إِنَّ", "lemma": "إِنَّ", "pos": "part",
+         "head": 0, "irab_role": "حرف نصب",
+         "evidence": ["sentence_initial", "lemma_in_inna_sisters"]},
+        {"id": 2, "form": "العراقيين", "diac": "العِراقِيِّينَ", "lemma": "عِراقِيّ", "pos": "noun",
+         "feats": {"case": "acc", "state": "def", "gen": "m", "num": "p"},
+         "head": 1, "irab_role": "اسم إنّ",
+         "evidence": ["case=acc", "head_lemma_in_inna_sisters", "immediately_follows_particle"]},
+        {"id": 3, "form": "قادرون", "diac": "قادِرونَ", "lemma": "قادِر", "pos": "adj",
+         "feats": {"case": "nom", "state": "indef", "gen": "m", "num": "p"},
+         "head": 1, "irab_role": "خبر إنّ",
+         "evidence": ["case=nom", "head_lemma_in_inna_sisters"]}
+      ],
+      "notes": "INVERSE of كان: إنّ makes the اسم منصوب and keeps the خبر مرفوع. Both attach to إنّ (I3rab); PADT instead attaches the topic under the predicate — see I3rab paper Fig 11. Case marked by ياء/واو (sound masculine plural), not حركة."
+    },
+
+    {
+      "id": "jussive_lam_01",
+      "sentence": "لم يقرأ محمد الكتاب",
+      "category": "particle_jussive",
+      "tier": 1,
+      "tokens": [
+        {"id": 1, "form": "لم", "diac": "لَمْ", "lemma": "لَمْ", "pos": "part",
+         "head": 0, "irab_role": "حرف جزم",
+         "evidence": ["sentence_initial", "jussive_particle"]},
+        {"id": 2, "form": "يقرأ", "diac": "يَقْرَأْ", "lemma": "قَرَأ", "pos": "verb",
+         "feats": {"mood": "jussive", "voice": "active", "person": 3, "gen": "m", "num": "s"},
+         "head": 1, "irab_role": "فعل مضارع مجزوم",
+         "evidence": ["mood=jussive", "head_is_jussive_particle"]},
+        {"id": 3, "form": "محمد", "diac": "مُحَمَّدٌ", "lemma": "مُحَمَّد", "pos": "propn",
+         "feats": {"case": "nom", "state": "indef", "gen": "m", "num": "s"},
+         "head": 2, "irab_role": "فاعل",
+         "evidence": ["case=nom", "head_pos=verb", "follows_verb"]},
+        {"id": 4, "form": "الكتاب", "diac": "الكِتابَ", "lemma": "كِتاب", "pos": "noun",
+         "feats": {"case": "acc", "state": "def", "gen": "m", "num": "s"},
+         "head": 2, "irab_role": "مفعول به",
+         "evidence": ["case=acc", "head_pos=verb"]}
+      ],
+      "notes": "Particle is root and governs the verb's mood. Still a verbal sentence. PADT/UD would make the verb the head and attach لم as a dependent — I3rab inverts this (paper Fig 16)."
+    },
+
+    {
+      "id": "subjunctive_lan_01",
+      "sentence": "لن يكتب الطالب الدرس",
+      "category": "particle_subjunctive",
+      "tier": 1,
+      "tokens": [
+        {"id": 1, "form": "لن", "diac": "لَنْ", "lemma": "لَنْ", "pos": "part",
+         "head": 0, "irab_role": "حرف نصب",
+         "evidence": ["sentence_initial", "subjunctive_particle"]},
+        {"id": 2, "form": "يكتب", "diac": "يَكْتُبَ", "lemma": "كَتَب", "pos": "verb",
+         "feats": {"mood": "subjunctive", "voice": "active", "person": 3, "gen": "m", "num": "s"},
+         "head": 1, "irab_role": "فعل مضارع منصوب",
+         "evidence": ["mood=subjunctive", "head_is_subjunctive_particle"]},
+        {"id": 3, "form": "الطالب", "diac": "الطالِبُ", "lemma": "طالِب", "pos": "noun",
+         "feats": {"case": "nom", "state": "def", "gen": "m", "num": "s"},
+         "head": 2, "irab_role": "فاعل",
+         "evidence": ["case=nom", "head_pos=verb", "follows_verb"]},
+        {"id": 4, "form": "الدرس", "diac": "الدَّرْسَ", "lemma": "دَرْس", "pos": "noun",
+         "feats": {"case": "acc", "state": "def", "gen": "m", "num": "s"},
+         "head": 2, "irab_role": "مفعول به",
+         "evidence": ["case=acc", "head_pos=verb"]}
+      ],
+      "notes": "Same shape as لم but subjunctive mood. Tests that the particle rule generalises across جازم/ناصب."
+    },
+
+    {
+      "id": "idafa_01",
+      "sentence": "كتاب الطالب جديد",
+      "category": "idafa",
+      "tier": 1,
+      "tokens": [
+        {"id": 1, "form": "كتاب", "diac": "كِتابُ", "lemma": "كِتاب", "pos": "noun",
+         "feats": {"case": "nom", "state": "construct", "gen": "m", "num": "s"},
+         "head": 0, "irab_role": "مبتدأ — مضاف",
+         "evidence": ["sentence_initial", "pos=noun", "case=nom", "state=construct"]},
+        {"id": 2, "form": "الطالب", "diac": "الطالِبِ", "lemma": "طالِب", "pos": "noun",
+         "feats": {"case": "gen", "state": "def", "gen": "m", "num": "s"},
+         "head": 1, "irab_role": "مضاف إليه",
+         "evidence": ["case=gen", "head_state=construct", "immediately_follows_head"]},
+        {"id": 3, "form": "جديد", "diac": "جَديدٌ", "lemma": "جَديد", "pos": "adj",
+         "feats": {"case": "nom", "state": "indef", "gen": "m", "num": "s"},
+         "head": 1, "irab_role": "خبر",
+         "evidence": ["case=nom", "head_is_topic"]}
+      ],
+      "notes": "Requires state=construct from CAMeL — this is the test that morphology is wired through, not just structure. خبر attaches to the مضاف (the topic), not to the مضاف إليه."
+    },
+
+    {
+      "id": "sifa_01",
+      "sentence": "الكتاب الجديد مفيد",
+      "category": "sifa",
+      "tier": 1,
+      "tokens": [
+        {"id": 1, "form": "الكتاب", "diac": "الكِتابُ", "lemma": "كِتاب", "pos": "noun",
+         "feats": {"case": "nom", "state": "def", "gen": "m", "num": "s"},
+         "head": 0, "irab_role": "مبتدأ",
+         "evidence": ["sentence_initial", "pos=noun", "case=nom"]},
+        {"id": 2, "form": "الجديد", "diac": "الجَديدُ", "lemma": "جَديد", "pos": "adj",
+         "feats": {"case": "nom", "state": "def", "gen": "m", "num": "s"},
+         "head": 1, "irab_role": "صفة",
+         "evidence": ["pos=adj", "agrees_case", "agrees_definiteness", "agrees_gender", "agrees_number"]},
+        {"id": 3, "form": "مفيد", "diac": "مُفيدٌ", "lemma": "مُفيد", "pos": "adj",
+         "feats": {"case": "nom", "state": "indef", "gen": "m", "num": "s"},
+         "head": 1, "irab_role": "خبر",
+         "evidence": ["case=nom", "head_is_topic", "definiteness_mismatch_with_head"]}
+      ],
+      "notes": "Both الجديد and مفيد are adjectives attaching to الكتاب. The discriminator is DEFINITENESS: صفة agrees (both definite), خبر does not (indefinite). This is the confusion the rule engine will make."
+    }
+  ]
+}

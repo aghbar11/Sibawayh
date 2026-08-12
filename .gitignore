@@ -1,0 +1,21 @@
+# local working docs
+docs/PLAN.md
+
+# licensed data — MUST NOT be committed
+data/ldc/
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# env & secrets
+.env
+.env.*
+
+# os
+.DS_Store
