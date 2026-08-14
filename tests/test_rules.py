@@ -1,8 +1,8 @@
 """Rule engine skeleton tests.
 
 Mostly about the machinery — ordering, first-match-wins, abstention, purity —
-because the inventory that will exercise it properly is the next step. The two
-starter rules are checked against the eval sentences they apply to.
+because the rule inventory itself has a test file per rules module. The two
+simplest rules are checked here against the eval sentences they apply to.
 """
 
 from __future__ import annotations
@@ -13,14 +13,16 @@ from pathlib import Path
 
 import pytest
 from sibawayh.rules import (
+    ALL_RULES,
     Finding,
     Registry,
     Rule,
     RuleError,
     apply_rules,
-    starter_registry,
+    default_registry,
 )
-from sibawayh.rules.starter import COVERT_AGENT, PREP_OBJECT
+from sibawayh.rules.modifiers import PREP_OBJECT
+from sibawayh.rules.verbal import COVERT_AGENT
 from sibawayh.schema import Pos, Sentence, Source, Token
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -119,9 +121,9 @@ def test_duplicate_ids_are_refused() -> None:
 
 
 def test_membership_and_length() -> None:
-    registry = starter_registry()
-    assert len(registry) == 2
-    assert "COVERT_AGENT" in registry
+    registry = default_registry()
+    assert len(registry) == len(ALL_RULES)
+    assert "PREP_OBJECT" in registry
     assert "NOT_A_RULE" not in registry
 
 
@@ -139,9 +141,16 @@ def test_stage_writes_role_rule_id_and_provenance() -> None:
 
 
 def test_stage_abstains_rather_than_guessing() -> None:
-    """المبتدأ has no starter rule. It must come back untouched, not blank-labelled."""
-    tokens = tokens_of("nominal_single_predicate_01")
-    result = apply_rules([t.model_copy(update={"irab_role": None}) for t in tokens])
+    """A token no rule matches comes back untouched, not blank-labelled.
+
+    Morphology this thin is exactly what undiacritized input produces once
+    `cas=u` has been honoured, so this is the common case, not a contrived one.
+    """
+    tokens = [
+        Token(id=1, form="الشمس", pos=Pos.NOUN, head=0),
+        Token(id=2, form="مشرقة", pos=Pos.ADJ, head=1),
+    ]
+    result = apply_rules(tokens)
     assert all(token.irab_role is None for token in result)
     assert all(token.rule_id is None for token in result)
     assert all("irab_role" not in token.provenance for token in result)
@@ -197,7 +206,7 @@ def test_root_token_gets_a_none_head() -> None:
     assert seen[1] is not None and seen[1].form == "يأكل"
 
 
-# --- the two starter rules ----------------------------------------------------------
+# --- two rules with the simplest possible justification ----------------------------
 
 
 def test_covert_agent_fires_on_the_inserted_pronoun() -> None:
@@ -234,15 +243,17 @@ def test_prep_object_names_the_governing_preposition() -> None:
 
 def test_prep_object_does_not_fire_under_a_noun() -> None:
     """الطاولة in nominal_adv_predicate_01 hangs off فوق, which is a noun, not a
-    preposition — it is مضاف إليه and belongs to a rule that does not exist yet."""
+    preposition. It is مضاف إليه — genitive either way, but a different rule and
+    a different explanation."""
     tokens = tokens_of("nominal_adv_predicate_01")
     result = apply_rules([t.model_copy(update={"irab_role": None}) for t in tokens])
     assert result[2].form == "الطاولة"
-    assert result[2].irab_role is None
+    assert result[2].rule_id == "IDAFA_ANNEXED"
+    assert PREP_OBJECT(result[2], result[1], result) is None
 
 
 @pytest.mark.parametrize("raw", EVAL, ids=[s["id"] for s in EVAL])
-def test_starter_rules_never_contradict_gold(raw: dict) -> None:
+def test_rules_never_contradict_gold(raw: dict) -> None:
     """Whatever the two rules do fire on must agree with the hand-verified role.
 
     Most tokens get nothing, which is correct — the inventory is the next step.

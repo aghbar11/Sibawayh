@@ -26,11 +26,33 @@ from sibawayh.rules.base import (
     Rule,
     RuleError,
 )
-from sibawayh.rules.starter import STARTER_RULES, starter_registry
+from sibawayh.rules.idafa import IDAFA_RULES
+from sibawayh.rules.modifiers import MODIFIER_RULES
+from sibawayh.rules.nawasikh import NAWASIKH_RULES
+from sibawayh.rules.nominal import NOMINAL_RULES
+from sibawayh.rules.particles import PARTICLE_RULES
+from sibawayh.rules.verbal import VERBAL_RULES
 from sibawayh.schema import ROOT_HEAD, Source, Token
 
+ALL_RULES = (
+    *VERBAL_RULES,
+    *NAWASIKH_RULES,
+    *NOMINAL_RULES,
+    *IDAFA_RULES,
+    *MODIFIER_RULES,
+    *PARTICLE_RULES,
+)
+"""Every rule, grouped by the file that owns it. Order here is cosmetic —
+`Registry` sorts on `(priority, id)`."""
+
 __all__ = [
-    "STARTER_RULES",
+    "ALL_RULES",
+    "IDAFA_RULES",
+    "MODIFIER_RULES",
+    "NAWASIKH_RULES",
+    "NOMINAL_RULES",
+    "PARTICLE_RULES",
+    "VERBAL_RULES",
     "Evidence",
     "Finding",
     "Predicate",
@@ -38,8 +60,17 @@ __all__ = [
     "Rule",
     "RuleError",
     "apply_rules",
-    "starter_registry",
+    "default_registry",
 ]
+
+
+def default_registry() -> Registry:
+    """Every rule, in priority order.
+
+    Built fresh on each call rather than shared, so a caller that adds a rule
+    for one sentence cannot affect anything else.
+    """
+    return Registry(ALL_RULES)
 
 
 def _head_of(token: Token, tokens: Sequence[Token]) -> Token | None:
@@ -64,7 +95,7 @@ def apply_rules(tokens: Sequence[Token], registry: Registry | None = None) -> li
     recorded, so an inserted pronoun keeps the note explaining why it exists as
     well as the note explaining what it is.
     """
-    registry = registry if registry is not None else starter_registry()
+    registry = registry if registry is not None else default_registry()
 
     applied: list[Token] = []
     for token in tokens:

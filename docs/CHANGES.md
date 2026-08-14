@@ -55,6 +55,12 @@ Newest last.
 | 11 | a rule's `when` returns its evidence, not a boolean — matching and evidence are one act |
 | 11 | the registry is constructed explicitly, never populated by import side effects |
 | 11 | rules take `(token, head, tokens)`; "sentence" is the token sequence, not a `Sentence` |
+| 12 | `rules/lexicon.py` added — closed-class word lists, matched diacritic-insensitively |
+| 12 | one rule per verb form rather than one rule with a computed role string |
+| 12 | verbal rules exclude النواسخ themselves rather than deferring to a file that does not exist |
+| 12 | 26 rules, not "roughly forty" — tier-2 roles have no gold and get none |
+| 12 | compound-role tokens live with the rule that knows the slot, not the part of speech |
+| 12 | `starter.py` removed; its two rules moved to `verbal.py` and `modifiers.py` |
 
 Two edits were made directly to `CLAUDE.md`, both requested: the `prc0` bullet now records that
 `d3tok` splits ال and that folding it back is the rule, and the conventions section now
@@ -563,6 +569,131 @@ with gold**. Most tokens get nothing, which is correct at this stage. What must 
 confident wrong answer, and that is what the test pins.
 
 `apply_rules` is also the only place in the pipeline that writes `irab_role`.
+
+---
+
+## Step 12 — core i'rab rules
+
+Taken one file at a time. This entry covers `verbal.py`; the rest follow.
+
+### `verbal.py` — the verb, فاعل، نائب فاعل، مفعول به
+
+Nine rules. Result on the eval set: **17 of 40 tokens labelled, 0 wrong.** The three plain verbal
+sentences come out complete; `jussive_lam_01` and `subjunctive_lan_01` come out complete apart
+from the particle itself, which is `particles.py`'s.
+
+#### The exclusions are the hard part, not the rules
+
+Two things had to be got right, and both are about *not* answering.
+
+**كان وأخواتها are not complete verbs.** A nominative under كان is اسم كان, not فاعل; an
+accusative is خبر كان, not مفعول به. Those roles belong to `nawasikh.py`, which does not exist
+yet — so every rule here excludes النواسخ **itself** rather than relying on a higher-priority file
+to outrank it later. Deferring would mean shipping a confident wrong answer in the meantime, on a
+sentence the eval set already contains. `nasikh_kana_01` comes back entirely unlabelled, which is
+the correct behaviour today.
+
+**A verb can be a خبر.** In محمد يقرأ الكتاب gold names the verb خبر — جملة فعلية, not
+فعل مضارع مرفوع. So the rules that name a verb's own form fire only when it *heads its clause* —
+at the root, or under a governing particle like لم. A verb hanging off a nominal is left for
+`nominal.py`.
+
+Two independent signals catch a ناسخ, for the same reason two signals catch an overt agent in
+`covert.py`: the lemma list, and a dependent labelled `PRD` — which CATiB uses *only* for
+كان وأخواتها and إنّ وأخواتها. Either one is enough, so a ناسخ missing from our list is still
+caught when the parser recognised it.
+
+#### One rule per verb form
+
+The verb's own role is a composed string — aspect, voice, mood. Rather than making `Rule.role`
+callable, it ships as five explicit rules: `VERB_PERFECT_ACTIVE`, `VERB_PERFECT_PASSIVE`,
+`VERB_IMPERFECT_INDICATIVE`, `VERB_IMPERFECT_SUBJUNCTIVE`, `VERB_IMPERFECT_JUSSIVE`.
+
+It costs a few more lines and buys a distinct `rule_id` per form, so a wrong answer names the exact
+rule that produced it and the hint text can differ per form — which it will, since explaining
+جزم is not explaining بناء للمجهول. `Rule` itself stays unchanged.
+
+**A passive imperfect has no rule.** Gold has no example, and inventing the string would be a
+guess; the imperfect rules explicitly refuse a passive verb rather than silently dropping the
+voice from the answer.
+
+#### `rules/lexicon.py`
+
+Closed-class word lists — كان وأخواتها, إنّ وأخواتها, the jussive and subjunctive particles.
+Membership is a *lexical* fact that no analyser reports, so it has to be written down, and it is
+shared: `verbal.py` needs النواسخ to exclude them, `nawasikh.py` will need the same set to claim
+them.
+
+Matching strips diacritics. CAMeL returns `كانَ`, the list is written `كان`, and the eval set's
+gold lemmas are bare; comparing stripped forms lets all three be right. The surface form is a
+fallback when there is no lemma, which is how hand-written test tokens and inserted tokens arrive.
+
+#### `starter.py` is being emptied
+
+`COVERT_AGENT` moved here, where فاعل belongs. `PREP_OBJECT` stays in `starter.py` until
+`modifiers.py` lands and takes جار ومجرور with it. `default_registry()` now composes every rule
+written so far and is what `apply_rules` uses by default.
+
+#### The remaining five files
+
+Shipped together, since they interlock: `nawasikh.py` claims exactly what `verbal.py` excludes,
+and `modifiers.py` and `nominal.py` split the صفة/خبر pair between them.
+
+**Result: 40 of 40 eval tokens correctly labelled, none wrong, none abstained.** End to end on the
+real model — parse, arcs, covert insertion, rules — all thirteen sentences produce the gold
+analysis.
+
+26 rules, not the plan's "roughly forty". The difference is tier 2: حال, تمييز, بدل, توكيد,
+عطف and مفعول مطلق have no tier-1 gold, and a rule written with nothing to verify it against is a
+guess wearing a role name. They arrive with the sentences that test them.
+
+| file | rules | roles |
+|---|---|---|
+| `verbal.py` | 9 | the verb's form, فاعل، نائب فاعل، مفعول به |
+| `nominal.py` | 6 | مبتدأ، مبتدأ — مضاف، and all three خبر shapes |
+| `nawasikh.py` | 5 | فعل ماضٍ ناقص، اسم/خبر كان، اسم/خبر إنّ |
+| `particles.py` | 3 | حرف جزم، حرف نصب (two routes) |
+| `modifiers.py` | 2 | صفة، مجرور |
+| `idafa.py` | 1 | مضاف إليه |
+
+#### Every discriminator is morphological, exactly as predicted
+
+The claim made back when CATiB was chosen — that the parser narrows and morphology decides — is
+now load-bearing code rather than an argument:
+
+- **اسم كان vs خبر إنّ.** Both nominative, both hanging off a ناسخ. Only the **head's lemma**
+  separates them, because the two families assign opposite cases. A test asserts that the same
+  nominative token flips role when only the head changes.
+- **صفة vs خبر.** In الكتاب الجديد مفيد both adjectives are nominative under the same noun on the
+  same arc. **Definiteness** is the entire difference. A test flips one feature and asserts the
+  answer inverts.
+- **مضاف إليه.** Needs `state=construct` on the head *and* genitive on the dependent. This is the
+  `stt=c` wiring CLAUDE.md named `idafa_01` to prove.
+- **فاعل vs نائب فاعل.** Voice on the head, as recorded earlier.
+
+Where a discriminator is missing the rules abstain rather than pick: an `unknown` state gives
+neither صفة nor خبر, an `unknown` case gives neither فاعل nor مفعول به.
+
+#### Placement decisions worth recording
+
+Gold names some tokens by the **slot they fill**, not by their part of speech —
+`حرف جر — خبر شبه جملة`, `ظرف مكان — خبر شبه جملة`, `مبتدأ — مضاف`. Those rules therefore live
+with the role that knows the slot: the شبه جملة predicates in `nominal.py` rather than
+`modifiers.py`, and the construct مبتدأ in `nominal.py` rather than `idafa.py`. Splitting them by
+part of speech would leave two rules competing to name one token.
+
+`particles.py` gives إنّ and لن the **same role string** `حرف نصب` through two separate rules. One
+governs a verb's mood, the other a noun's case; the evidence differs and the hint text will too.
+
+`starter.py` is gone — `COVERT_AGENT` moved to `verbal.py`, `PREP_OBJECT` to `modifiers.py`.
+
+#### What the tests pin
+
+The one that matters runs across **all thirteen** sentences and asserts that anything the rules do
+label agrees with gold. Abstaining is fine; contradicting gold is not. Alongside it: `cas=unknown`
+gets no role (CLAUDE.md's first trap), every sister of كان is excluded, a `PRD` dependent blocks
+the verb rules, and `COVERT_AGENT` and `PASSIVE_AGENT` are both verified to outrank the general
+`VERBAL_AGENT` — first-match-wins makes that ordering load-bearing rather than cosmetic.
 
 ---
 

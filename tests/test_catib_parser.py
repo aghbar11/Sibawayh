@@ -18,6 +18,7 @@ from sibawayh.arcs import normalize_arcs
 from sibawayh.covert import insert_covert_pronouns
 from sibawayh.parsers import Formalism, Parser, ParserError, attach
 from sibawayh.parsers.catib import MODEL_DIR_ENV, CatibParser, is_available, model_dir
+from sibawayh.rules import apply_rules
 from sibawayh.schema import ROOT_HEAD, Sentence, Source, Token
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -165,3 +166,33 @@ def test_end_to_end_including_the_covert_pronoun(raw: dict) -> None:
     assert [token.head for token in result] == [token.head for token in gold]
     assert [token.form for token in result] == [token.form for token in gold]
     assert [token.inserted for token in result] == [token.inserted for token in gold]
+
+
+@pytest.mark.parser
+@needs_model
+@pytest.mark.parametrize("raw", EVAL, ids=[s["id"] for s in EVAL])
+def test_the_whole_pipeline_produces_the_gold_irab(raw: dict) -> None:
+    """Real model, all the way to named roles.
+
+    parse -> attach -> arcs -> covert -> rules, against the hand-verified
+    `irab_role` of every gold token. This is the analysis a student would see.
+
+    Morphology is taken from gold: the rules key on case, state and voice, and
+    CAMeL's disagreements with gold on short undiacritized sentences are
+    recorded separately. What this asserts is that given correct morphology, the
+    structural pipeline and the rule inventory reach the right answer.
+    """
+    gold = Sentence.model_validate(raw).tokens
+    surface = [token for token in gold if not token.inserted]
+
+    parser = CatibParser()
+    bare = [Token(id=i, form=t.form) for i, t in enumerate(surface, start=1)]
+    parsed = normalize_arcs(attach(bare, parser), parser.formalism)
+    carried = [
+        token.model_copy(update={"pos": source.pos, "lemma": source.lemma, "feats": source.feats})
+        for token, source in zip(parsed, surface, strict=True)
+    ]
+    result = apply_rules(insert_covert_pronouns(carried))
+
+    assert [token.irab_role for token in result] == [token.irab_role for token in gold]
+    assert all(token.rule_id is not None for token in result)
