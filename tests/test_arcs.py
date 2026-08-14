@@ -80,7 +80,8 @@ def test_catib_fixture_is_a_well_formed_tree(tree: dict[str, Any]) -> None:
     assert heads.count(ROOT_HEAD) == 1, "exactly one root"
     assert all(ROOT_HEAD <= head <= len(tokens) for head in heads)
     assert all(head != token_id for token_id, head in zip(ids, heads, strict=True))
-    assert [token["label"] for token in tokens].count(None) == 1, "only the root is unlabelled"
+    root = heads.index(ROOT_HEAD)
+    assert tokens[root]["label"] == "---", "the model labels a governorless token `---`"
     assert tree["sentence"] == EVAL_BY_ID[tree["id"]]["sentence"]
 
 

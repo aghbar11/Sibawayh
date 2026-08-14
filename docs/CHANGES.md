@@ -45,6 +45,10 @@ Newest last.
 | 9 | `tests/data/catib_trees.json` — hand-derived CATiB input trees |
 | 7 | `Formalism.IRAB` renamed `Formalism.SIBAWAYH`; `Token.irab_role` left alone |
 | 2 | `parser_label` documented as a token property, not the name of its head arc |
+| 8 | checkpoint converted to plain tensors + JSON; the published pickle is never loaded at runtime |
+| 8 | `parser` extra is `supar`+`torch`, not `stanza`; `camel_parser` not used at all |
+| 8 | `CatibParser.labels()` sits outside the `Parser` interface |
+| 9 | CATiB fixture upgraded from hand-derived to verified against the real model |
 
 Two edits were made directly to `CLAUDE.md`, both requested: the `prc0` bullet now records that
 `d3tok` splits ال and that folding it back is the rule, and the conventions section now
@@ -232,8 +236,9 @@ There is no openly-licensed, training-sized Arabic UD treebank that ships its ow
 is the only free training corpus, and it is CATiB.** Committing to UD as the long-term formalism
 would guarantee the licensing problem rather than avoid it.
 
-In the future, I will train a CATiB parser on CamelTB alone. I think it will be shippable. Until then, we will use
-the existing CamelParser CATiB model, which is MIT-licensed and trained on CamelTB + PATB. The
+In the future, I will train a CATiB parser on CamelTB alone. I think it will be shippable. Until
+then, we will use the existing CamelParser CATiB model, which is MIT-licensed and trained on
+CamelTB + PATB.
 
 ### Why CATiB suits i'rab better anyway
 
@@ -257,9 +262,98 @@ are traditional-grammar-shaped:
 | `IDF` / `TMZ` | مضاف إليه · تمييز | — 1:1 |
 
 Every discriminator in the right column is morphology, not attachment, and no parser in any
-formalism can see them. `verbal_passive_01` is `SBJ` either way; `vox=p` is what makes it نائب
-فاعل. Nor do labels supply abstention, the `evidence` lists the hint ladder is built from, or
-covert pronouns.
+formalism can see them. Nor do labels supply abstention, the `evidence` lists the hint ladder is
+built from, or covert pronouns.
+
+`verbal_passive_01` makes the point harder than I first claimed. I wrote that it comes back `SBJ`
+either way and that only `vox=p` separates فاعل from نائب فاعل. The model actually emits **`OBJ`**:
+undiacritized كتبت reads just as easily as active كَتَبَت 'she wrote' with a covert agent, and CAMeL
+ranks that active reading first too. The head is unchanged, so normalization is untouched — but
+the label is not a reliable narrowing here, and voice is doing more work than the table suggests.
+
+### How it actually ships: converted, not loaded
+
+The published checkpoint is a 2023 `torch.save` of **live Python objects** — supar's config, its
+data transform, and a `transformers` 4.29 tokenizer frozen mid-flight. Loading it as published
+needs all four of:
+
+1. supar pinned to an unreleased git commit (`17ec77dd`), where `Config` lived at `supar.config`
+   rather than `supar.utils.config`. No PyPI release matches; `camel_parser` pins that SHA.
+2. `weights_only=False`. torch ≥2.6 refuses pickled classes by default, and the safe-globals
+   allowlist **cannot** bridge a renamed module — it keys on the class's real `__module__`, so
+   allowlisting an aliased path loops forever.
+3. A `sys.modules` alias for `transformers.models.bert.tokenization_bert_fast`, removed in 5.x.
+4. A serial replacement for supar's `mp.Pool`, hardcoded over a local closure and therefore
+   fork-only. It cannot run on Windows at all.
+
+Even with all four it still fails: the unpickled 4.29 tokenizer lacks `split_special_tokens`,
+which 5.x requires. `camel_parser` pins `transformers==4.29.2`, `torch==2.0.1`,
+`camel_tools==1.5.6`; our morphology layer is built and tested against camel-tools 1.6.0.
+Irreconcilable inside one environment.
+
+**So the checkpoint is converted once and never loaded again.**
+`scripts/convert_catib_checkpoint.py` opens it with those four shims, takes the parts that have no
+version, and writes:
+
+    weights.pt    212 plain tensors, loadable with `weights_only=True`
+    config.json   architecture settings + the CATiB label inventory
+
+`sibawayh/parsers/catib.py` reads only those two. All four problems disappear: ordinary `supar`
+from PyPI, no code execution on load, no module aliasing, and no supar `Dataset` — the subword
+tensor is built directly, which is what sidesteps the fork-only pool.
+
+Note this is the **model** we chose over Stanza, reached directly. What is not used is
+`camel_parser`, CAMeL's CLI wrapper around it: it redoes tokenization and POS tagging we already
+have, pins a conflicting stack, and writes CoNLL-X files where we want a return value.
+
+The tokenizer is deliberately not carried across. It was never the valuable part — stock
+CAMeLBERT-MSA, freely downloadable — and it was precisely what blocked loading. It is rebuilt at
+runtime from the repo the checkpoint names in `args.bert`, and the backend refuses to run if the
+two disagree: the embedding table has 30000 rows, that tokenizer has 30000 entries, and a mismatch
+would map every word to the wrong row. It is a *subword* tokenizer and it never re-segments the
+sentence — it splits within each CAMeL token (العصفور → `العص` + `##فور`) and the encoder pools the
+pieces back, so one CAMeL token still gets exactly one head.
+
+Evidence the transplant is exact:
+
+- `load_state_dict(strict=True)` — **0 missing, 0 unexpected.** The single dropped key,
+  `encoder.model.embeddings.position_ids`, is a constant buffer newer transformers no longer
+  registers, not a learned weight.
+- The rebuilt model reproduces **13 of 13** CATiB trees, heads and labels both.
+
+The checkpoint's `args` also settle the licensing question above from the other direction: `train`
+reads `PATB123-train+CamelTB-ALL-train` — PATB (LDC) combined with CamelTB (open), exactly as the
+model card says. `eval_only` stays `False` on the strength of the MIT grant; recorded, not
+resolved.
+
+**One trap worth recording.** The first download was silently truncated at 375MB of 445MB. It
+still carried a valid zip header, so it failed much later with "failed finding central directory",
+which reads like a corrupt model rather than a short read. The conversion script checks the size
+first.
+
+### `labels()` is deliberately outside the `Parser` interface
+
+`CatibParser.labels(tokens)` returns CATiB relation names. It is a separate method on purpose:
+`Parser.parse` returns `Parse`, which holds integers and structurally cannot carry a role — the
+guarantee that keeps `parser_label` and `irab_role` apart. Putting labels in the interface would
+hand every future backend a channel for smuggling roles into the pipeline. Callers that want them
+as *evidence* ask explicitly.
+
+### Arc confidence turned out to be reachable
+
+The plan said *"extract arc confidence from the biaffine score matrix if reachable."* It is:
+`s_arc.softmax(-1)` is P(head | dependent), and `parse` returns the probability of the chosen head
+as `Parse.confidence`. The first real input to the abstention layer.
+
+### Test tiers
+
+The converted model is ~440MB and is not in version control, so the backend's tests split: the
+wrapper's own logic runs by default with no model present, and the tests that touch the real model
+carry a `parser` marker, deselected like `camel`. `addopts` is now
+`-m 'not camel and not parser'`. One of the default tests asserts that importing
+`sibawayh.parsers.catib` does **not** import torch — loading is deferred so the morphology-only CLI
+stays fast, and that is easy to break by accident.
+
 ---
 
 ## Step 9 — arc normalization becomes per-formalism
@@ -321,7 +415,7 @@ longer exists: in كتاب الطالب جديد, كتاب keeps `SBJ` while bec
 anyway and the schema now says why — it stays useful *evidence* (`SBJ` argues for فاعل or مبتدأ
 however the tree was re-hung) and it is the strongest signal the parser hands the rule engine.
 Read as a property of the token, never as the name of an edge.
-
+/
 ### Coordination, now with a concrete failure mode
 
 Still a known gap, as planned, but the guidelines make the symptom specific: a sentence-initial و

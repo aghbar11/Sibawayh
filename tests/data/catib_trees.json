@@ -1,5 +1,5 @@
 {
-  "$comment": "CATiB trees for the tier-1 eval sentences — the input side of arc normalization. HAND-DERIVED from Habash, Faraj & Roth 2009 (Syntactic Annotation in the Columbia Arabic Treebank), whose Figure 1 gives worked trees for these exact constructions. NOT recorded from a parser: the backend does not exist yet. Re-verify every tree against real model output once it does, and on a mismatch suspect this file first. `head` is the id of the governing token, 0 for the root, matching the eval set and Parse.heads. `label` is null on a root: CATiB's `---` means flat (parts of a proper name), not root. Inserted covert pronouns are absent by construction — no parser emits them, and insertion runs after this stage.",
+  "$comment": "CATiB trees for the tier-1 eval sentences — the input side of arc normalization. First derived by hand from Habash, Faraj & Roth 2009 (Syntactic Annotation in the Columbia Arabic Treebank), then VERIFIED against real output from CAMeL-Lab/camelbert-catib-parser: every head matched, and the labels are now the model's own. `head` is the id of the governing token, 0 for the root, matching the eval set and Parse.heads. A root carries the label `---`, which is what the model emits there — the guidelines describe `---` as the flat relation, but the CoNLL encoding reuses it for a token with no governor. Inserted covert pronouns are absent by construction: no parser emits them, and insertion runs after this stage.",
   "schema_version": 1,
   "source": {
     "citation": "Habash, Faraj & Roth 2009, Syntactic Annotation in the Columbia Arabic Treebank",
@@ -30,9 +30,27 @@
       "sentence": "يأكل الرجل السمك",
       "figure": "1(a) كتب الرجال الكتاب",
       "tokens": [
-        {"id": 1, "form": "يأكل", "catib_pos": "VRB", "head": 0, "label": null},
-        {"id": 2, "form": "الرجل", "catib_pos": "NOM", "head": 1, "label": "SBJ"},
-        {"id": 3, "form": "السمك", "catib_pos": "NOM", "head": 1, "label": "OBJ"}
+        {
+          "id": 1,
+          "form": "يأكل",
+          "catib_pos": "VRB",
+          "head": 0,
+          "label": "---"
+        },
+        {
+          "id": 2,
+          "form": "الرجل",
+          "catib_pos": "NOM",
+          "head": 1,
+          "label": "SBJ"
+        },
+        {
+          "id": 3,
+          "form": "السمك",
+          "catib_pos": "NOM",
+          "head": 1,
+          "label": "OBJ"
+        }
       ],
       "notes": "Verb-initial, so CATiB and i'rab already agree. Re-rooting is a no-op."
     },
@@ -41,9 +59,27 @@
       "sentence": "كتب الطالب المقالة",
       "figure": "1(a) كتب الرجال الكتاب",
       "tokens": [
-        {"id": 1, "form": "كتب", "catib_pos": "VRB", "head": 0, "label": null},
-        {"id": 2, "form": "الطالب", "catib_pos": "NOM", "head": 1, "label": "SBJ"},
-        {"id": 3, "form": "المقالة", "catib_pos": "NOM", "head": 1, "label": "OBJ"}
+        {
+          "id": 1,
+          "form": "كتب",
+          "catib_pos": "VRB",
+          "head": 0,
+          "label": "---"
+        },
+        {
+          "id": 2,
+          "form": "الطالب",
+          "catib_pos": "NOM",
+          "head": 1,
+          "label": "SBJ"
+        },
+        {
+          "id": 3,
+          "form": "المقالة",
+          "catib_pos": "NOM",
+          "head": 1,
+          "label": "OBJ"
+        }
       ],
       "notes": "Aspect does not change tree shape in CATiB either. CATiB has one VRB tag for both aspects."
     },
@@ -52,18 +88,42 @@
       "sentence": "كتبت المقالة",
       "figure": "1(d) كتب الكتاب",
       "tokens": [
-        {"id": 1, "form": "كتبت", "catib_pos": "VRB-PASS", "head": 0, "label": null},
-        {"id": 2, "form": "المقالة", "catib_pos": "NOM", "head": 1, "label": "SBJ"}
+        {
+          "id": 1,
+          "form": "كتبت",
+          "catib_pos": "VRB-PASS",
+          "head": 0,
+          "label": "---"
+        },
+        {
+          "id": 2,
+          "form": "المقالة",
+          "catib_pos": "NOM",
+          "head": 1,
+          "label": "OBJ"
+        }
       ],
-      "notes": "Guidelines: 'For passive verbs (VRB-PASS), SBJ is the surface subject.' Voice lives in the POS tag, never the relation, so نائب فاعل stays the rule engine's call off morphology."
+      "notes": "The one place the model disagrees with the guidelines, and it is right to. The guidelines say 'For passive verbs (VRB-PASS), SBJ is the surface subject', which would make المقالة SBJ. The model emits OBJ, because undiacritized كتبت reads just as easily as active كَتَبَت 'she wrote' with a covert agent — and CAMeL ranks that active reading first too. The head is 0,1 either way, so normalization is untouched; only the label moves, and نائب فاعل vs مفعول به was always the rule engine's call off voice."
     },
     {
       "id": "nominal_single_predicate_01",
       "sentence": "الشمس مشرقة",
       "figure": "1(e) الكتاب مهم",
       "tokens": [
-        {"id": 1, "form": "الشمس", "catib_pos": "NOM", "head": 2, "label": "SBJ"},
-        {"id": 2, "form": "مشرقة", "catib_pos": "NOM", "head": 0, "label": null}
+        {
+          "id": 1,
+          "form": "الشمس",
+          "catib_pos": "NOM",
+          "head": 2,
+          "label": "SBJ"
+        },
+        {
+          "id": 2,
+          "form": "مشرقة",
+          "catib_pos": "NOM",
+          "head": 0,
+          "label": "---"
+        }
       ],
       "notes": "Guidelines: 'the verbless complement/predicate (الخبر) heads the topic/subject (المبتدأ)'. i'rab roots at المبتدأ, so this arc is the one that moves."
     },
@@ -72,9 +132,27 @@
       "sentence": "العصفور في القفص",
       "figure": "1(h) الكتاب عن فلسطين",
       "tokens": [
-        {"id": 1, "form": "العصفور", "catib_pos": "NOM", "head": 2, "label": "SBJ"},
-        {"id": 2, "form": "في", "catib_pos": "PRT", "head": 0, "label": null},
-        {"id": 3, "form": "القفص", "catib_pos": "NOM", "head": 2, "label": "OBJ"}
+        {
+          "id": 1,
+          "form": "العصفور",
+          "catib_pos": "NOM",
+          "head": 2,
+          "label": "SBJ"
+        },
+        {
+          "id": 2,
+          "form": "في",
+          "catib_pos": "PRT",
+          "head": 0,
+          "label": "---"
+        },
+        {
+          "id": 3,
+          "form": "القفص",
+          "catib_pos": "NOM",
+          "head": 2,
+          "label": "OBJ"
+        }
       ],
       "notes": "'The predicate of a nominal sentence can also be a preposition' — so the preposition roots the sentence. It already heads its object, which is the arc UD would invert and CATiB does not. Only the root moves."
     },
@@ -83,9 +161,27 @@
       "sentence": "الكتاب فوق الطاولة",
       "figure": "1(e) + Nominal Modifiers",
       "tokens": [
-        {"id": 1, "form": "الكتاب", "catib_pos": "NOM", "head": 2, "label": "SBJ"},
-        {"id": 2, "form": "فوق", "catib_pos": "NOM", "head": 0, "label": null},
-        {"id": 3, "form": "الطاولة", "catib_pos": "NOM", "head": 2, "label": "IDF"}
+        {
+          "id": 1,
+          "form": "الكتاب",
+          "catib_pos": "NOM",
+          "head": 2,
+          "label": "SBJ"
+        },
+        {
+          "id": 2,
+          "form": "فوق",
+          "catib_pos": "NOM",
+          "head": 0,
+          "label": "---"
+        },
+        {
+          "id": 3,
+          "form": "الطاولة",
+          "catib_pos": "NOM",
+          "head": 2,
+          "label": "IDF"
+        }
       ],
       "notes": "CATiB has no adverb tag: 'Preposition-like nouns/adverbs such as أمام and فوق are considered NOMs', and 'idafa is also used to mark the objects of preposition-like nominal adverbs'."
     },
@@ -94,9 +190,27 @@
       "sentence": "محمد يقرأ الكتاب",
       "figure": "1(j) الرجال كتبوا الكتاب",
       "tokens": [
-        {"id": 1, "form": "محمد", "catib_pos": "PROP", "head": 2, "label": "SBJ"},
-        {"id": 2, "form": "يقرأ", "catib_pos": "VRB", "head": 0, "label": null},
-        {"id": 3, "form": "الكتاب", "catib_pos": "NOM", "head": 2, "label": "OBJ"}
+        {
+          "id": 1,
+          "form": "محمد",
+          "catib_pos": "PROP",
+          "head": 2,
+          "label": "SBJ"
+        },
+        {
+          "id": 2,
+          "form": "يقرأ",
+          "catib_pos": "VRB",
+          "head": 0,
+          "label": "---"
+        },
+        {
+          "id": 3,
+          "form": "الكتاب",
+          "catib_pos": "NOM",
+          "head": 2,
+          "label": "OBJ"
+        }
       ],
       "notes": "SBJ not TPC: the topic 'is marked as SBJ if it is the same as the subject inside the complement; otherwise TPC'. Here it is the same. CATiB gives this the same tree as verb-initial 1(a) — i'rab does not, and word order is what separates them. Three tokens here, four in gold: the covert فاعل is inserted downstream."
     },
@@ -105,9 +219,27 @@
       "sentence": "كان اليوم رائعا",
       "figure": "1(f) كان الكتاب مهما",
       "tokens": [
-        {"id": 1, "form": "كان", "catib_pos": "VRB", "head": 0, "label": null},
-        {"id": 2, "form": "اليوم", "catib_pos": "NOM", "head": 1, "label": "SBJ"},
-        {"id": 3, "form": "رائعا", "catib_pos": "NOM", "head": 1, "label": "PRD"}
+        {
+          "id": 1,
+          "form": "كان",
+          "catib_pos": "VRB",
+          "head": 0,
+          "label": "---"
+        },
+        {
+          "id": 2,
+          "form": "اليوم",
+          "catib_pos": "NOM",
+          "head": 1,
+          "label": "SBJ"
+        },
+        {
+          "id": 3,
+          "form": "رائعا",
+          "catib_pos": "NOM",
+          "head": 1,
+          "label": "PRD"
+        }
       ],
       "notes": "'the topic/subject and complement/predicate are considered children of the incomplete verb with the relations SBJ and PRD'. Already i'rab-shaped."
     },
@@ -116,9 +248,27 @@
       "sentence": "إن العراقيين قادرون",
       "figure": "1(g) إن الكتاب مهم",
       "tokens": [
-        {"id": 1, "form": "إن", "catib_pos": "PRT", "head": 0, "label": null},
-        {"id": 2, "form": "العراقيين", "catib_pos": "NOM", "head": 1, "label": "SBJ"},
-        {"id": 3, "form": "قادرون", "catib_pos": "NOM", "head": 1, "label": "PRD"}
+        {
+          "id": 1,
+          "form": "إن",
+          "catib_pos": "PRT",
+          "head": 0,
+          "label": "---"
+        },
+        {
+          "id": 2,
+          "form": "العراقيين",
+          "catib_pos": "NOM",
+          "head": 1,
+          "label": "SBJ"
+        },
+        {
+          "id": 3,
+          "form": "قادرون",
+          "catib_pos": "NOM",
+          "head": 1,
+          "label": "PRD"
+        }
       ],
       "notes": "'The same happens when a verb-like particle (إنّ وأخواتها) precedes the nominal sentence.' PADT attaches the topic under the predicate (I3rab Fig 11); CATiB agrees with i'rab instead, so nothing flips."
     },
@@ -127,10 +277,34 @@
       "sentence": "لم يقرأ محمد الكتاب",
       "figure": "1(o) لم يكتب الرجل كتابا",
       "tokens": [
-        {"id": 1, "form": "لم", "catib_pos": "PRT", "head": 2, "label": "MOD"},
-        {"id": 2, "form": "يقرأ", "catib_pos": "VRB", "head": 0, "label": null},
-        {"id": 3, "form": "محمد", "catib_pos": "PROP", "head": 2, "label": "SBJ"},
-        {"id": 4, "form": "الكتاب", "catib_pos": "NOM", "head": 2, "label": "OBJ"}
+        {
+          "id": 1,
+          "form": "لم",
+          "catib_pos": "PRT",
+          "head": 2,
+          "label": "MOD"
+        },
+        {
+          "id": 2,
+          "form": "يقرأ",
+          "catib_pos": "VRB",
+          "head": 0,
+          "label": "---"
+        },
+        {
+          "id": 3,
+          "form": "محمد",
+          "catib_pos": "PROP",
+          "head": 2,
+          "label": "SBJ"
+        },
+        {
+          "id": 4,
+          "form": "الكتاب",
+          "catib_pos": "NOM",
+          "head": 2,
+          "label": "OBJ"
+        }
       ],
       "notes": "'A variety of particles can modify verbs' tense, polarity and aspect. These particles always attach under the verb with the relation MOD.' Same as PADT/UD; i'rab inverts it (I3rab Fig 16), which is exactly what re-rooting does."
     },
@@ -139,10 +313,34 @@
       "sentence": "لن يكتب الطالب الدرس",
       "figure": "1(o) لم يكتب الرجل كتابا",
       "tokens": [
-        {"id": 1, "form": "لن", "catib_pos": "PRT", "head": 2, "label": "MOD"},
-        {"id": 2, "form": "يكتب", "catib_pos": "VRB", "head": 0, "label": null},
-        {"id": 3, "form": "الطالب", "catib_pos": "NOM", "head": 2, "label": "SBJ"},
-        {"id": 4, "form": "الدرس", "catib_pos": "NOM", "head": 2, "label": "OBJ"}
+        {
+          "id": 1,
+          "form": "لن",
+          "catib_pos": "PRT",
+          "head": 2,
+          "label": "MOD"
+        },
+        {
+          "id": 2,
+          "form": "يكتب",
+          "catib_pos": "VRB",
+          "head": 0,
+          "label": "---"
+        },
+        {
+          "id": 3,
+          "form": "الطالب",
+          "catib_pos": "NOM",
+          "head": 2,
+          "label": "SBJ"
+        },
+        {
+          "id": 4,
+          "form": "الدرس",
+          "catib_pos": "NOM",
+          "head": 2,
+          "label": "OBJ"
+        }
       ],
       "notes": "Same shape as لم — both are negation particles under the guidelines' PRT. The جازم/ناصب distinction is mood, which no arc records."
     },
@@ -151,9 +349,27 @@
       "sentence": "كتاب الطالب جديد",
       "figure": "1(e) + 2(a)",
       "tokens": [
-        {"id": 1, "form": "كتاب", "catib_pos": "NOM", "head": 3, "label": "SBJ"},
-        {"id": 2, "form": "الطالب", "catib_pos": "NOM", "head": 1, "label": "IDF"},
-        {"id": 3, "form": "جديد", "catib_pos": "NOM", "head": 0, "label": null}
+        {
+          "id": 1,
+          "form": "كتاب",
+          "catib_pos": "NOM",
+          "head": 3,
+          "label": "SBJ"
+        },
+        {
+          "id": 2,
+          "form": "الطالب",
+          "catib_pos": "NOM",
+          "head": 1,
+          "label": "IDF"
+        },
+        {
+          "id": 3,
+          "form": "جديد",
+          "catib_pos": "NOM",
+          "head": 0,
+          "label": "---"
+        }
       ],
       "notes": "IDF already runs possessor to possessed, so المضاف إليه hangs off المضاف and needs no flip. The root sits two arcs from token 1, so re-rooting reverses a path of length two."
     },
@@ -162,9 +378,27 @@
       "sentence": "الكتاب الجديد مفيد",
       "figure": "1(e) + 2(h)",
       "tokens": [
-        {"id": 1, "form": "الكتاب", "catib_pos": "NOM", "head": 3, "label": "SBJ"},
-        {"id": 2, "form": "الجديد", "catib_pos": "NOM", "head": 1, "label": "MOD"},
-        {"id": 3, "form": "مفيد", "catib_pos": "NOM", "head": 0, "label": null}
+        {
+          "id": 1,
+          "form": "الكتاب",
+          "catib_pos": "NOM",
+          "head": 3,
+          "label": "SBJ"
+        },
+        {
+          "id": 2,
+          "form": "الجديد",
+          "catib_pos": "NOM",
+          "head": 1,
+          "label": "MOD"
+        },
+        {
+          "id": 3,
+          "form": "مفيد",
+          "catib_pos": "NOM",
+          "head": 0,
+          "label": "---"
+        }
       ],
       "notes": "'The most basic use of MOD is to mark adjectival modification.' Both adjectives are NOM, and the صفة/خبر split is definiteness — invisible to the parser, and the rule engine's problem."
     }

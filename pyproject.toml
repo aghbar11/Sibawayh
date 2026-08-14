@@ -16,7 +16,11 @@ dependencies = [
 [project.optional-dependencies]
 # Installed per-phase, not up front. Each lands with the commit that needs it.
 morphology = ["camel-tools>=1.5"]
-parser = ["stanza>=1.8"]
+# supar supplies the biaffine architecture the CATiB weights belong to. The
+# published checkpoint was saved by an unreleased build, but we do not load the
+# checkpoint — only converted tensors — so a normal release works. `transformers`
+# arrives via camel-tools and supplies the CAMeLBERT encoder.
+parser = ["supar>=1.1.4", "torch>=2.0"]
 api = ["fastapi>=0.110", "uvicorn>=0.29"]
 dev = [
     "pytest>=8.0",
@@ -46,8 +50,9 @@ quote-style = "double"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q --strict-markers -m 'not camel'"
+addopts = "-q --strict-markers -m 'not camel and not parser'"
 markers = [
     "ldc: requires licensed PADT data under data/ldc/ (not in version control)",
     "camel: loads a live CAMeL model; deselected by default, run with `-m camel`",
+    "parser: loads the converted CATiB model; deselected by default, run with `-m parser`",
 ]
