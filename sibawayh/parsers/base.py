@@ -51,8 +51,13 @@ class Formalism(StrEnum):
     PADT = "padt"
     """Prague analytical functions — step 22's evaluation-only backend."""
 
-    IRAB = "irab"
-    """Not a backend's answer but the target: what arc normalization produces."""
+    SIBAWAYH = "sibawayh"
+    """Not a backend's answer but the target: what arc normalization produces.
+
+    Named for the project rather than for إعراب, because the other three are
+    published specifications and this one is not. The I3rab paper supplies a
+    label inventory; the arc conventions here are ours, and the name should not
+    imply a standard that nobody wrote down."""
 
 
 @dataclass(frozen=True)

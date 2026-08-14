@@ -36,7 +36,7 @@ class GoldParser(Parser):
     that `attach` puts back exactly what a backend returns."""
 
     name = "gold"
-    formalism = Formalism.IRAB
+    formalism = Formalism.SIBAWAYH
 
     def parse(self, tokens: Sequence[Token]) -> Parse:
         return Parse.of([token.head or ROOT_HEAD for token in tokens])
@@ -152,13 +152,16 @@ def test_formalism_is_readable_without_naming_the_backend() -> None:
     """Step 9 dispatches on this. It says what convention the arcs follow, not
     which backend produced them — the firewall stays intact."""
     assert FixedParser(Parse.of([])).formalism is Formalism.CATIB
-    assert GoldParser().formalism is Formalism.IRAB
+    assert GoldParser().formalism is Formalism.SIBAWAYH
 
 
 def test_formalism_values_cover_the_schemes_that_disagree() -> None:
     """CLAUDE.md's table: i'rab, PADT analytical and UD differ structurally.
-    CATiB is the fourth, and what step 8's backend speaks."""
-    assert {f.value for f in Formalism} == {"catib", "ud", "padt", "irab"}
+    CATiB is the fourth, and what our backend speaks.
+
+    `sibawayh` rather than `irab`: the other three name published specifications,
+    this one names ours."""
+    assert {f.value for f in Formalism} == {"catib", "ud", "padt", "sibawayh"}
 
 
 # --- attach -----------------------------------------------------------------------

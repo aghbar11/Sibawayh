@@ -197,7 +197,19 @@ class Token(BaseModel):
     feats: Features = Field(default_factory=Features)
 
     head: int | None = Field(default=None, ge=ROOT_HEAD)
+
     parser_label: str | None = None
+    """What the parser called this token, in the parser's own vocabulary.
+
+    Not necessarily a description of its current `head` arc. Arc normalization
+    moves arcs but not labels, so on a token whose head was re-rooted the label
+    describes an arc that no longer exists — CATiB's `SBJ` survives on a token
+    that is now the root. It is kept anyway because it stays useful *evidence*
+    (`SBJ` argues for فاعل or مبتدأ however the tree was later re-hung), and
+    because discarding it would throw away the strongest signal the parser gives
+    the rule engine. Read it as a property of the token, never as the name of an
+    edge.
+    """
     arc_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     """How sure the parser was of *this attachment*. Raw evidence for the
     combined `confidence` below, never a substitute for it."""

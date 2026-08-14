@@ -40,6 +40,11 @@ Newest last.
 | 8 | CATiB labels kept in `parser_label` as evidence; still discarded for role derivation |
 | 7 | `Parser.formalism` added so step 9 can dispatch instead of assuming one convention |
 | 9 | arc normalization is per-formalism, not a single UD-shaped pass |
+| 9 | CATiB → i'rab is re-rooting at token 1 and nothing else |
+| 9 | UD and PADT normalizers raise instead of being written blind |
+| 9 | `tests/data/catib_trees.json` — hand-derived CATiB input trees |
+| 7 | `Formalism.IRAB` renamed `Formalism.SIBAWAYH`; `Token.irab_role` left alone |
+| 2 | `parser_label` documented as a token property, not the name of its head arc |
 
 Two edits were made directly to `CLAUDE.md`, both requested: the `prc0` bullet now records that
 `d3tok` splits ال and that folding it back is the rule, and the conventions section now
@@ -270,15 +275,60 @@ formalism is chosen first. `Parser.formalism` (step 7, amended) is what the disp
 
 Cost of a future UD backend: one normalizer module. Nothing else moves.
 
-What the CATiB normalizer has to do is **smaller than the UD job but not empty**:
+### What the CATiB normalizer turned out to be
 
-- **Prepositions need no flip.** `OBJ` already puts the preposition at the head.
-- **Nominal sentences need re-rooting.** CATiB's `SBJ` covers *"topic of simple nominal
-  sentence"*, so the predicate heads and the topic depends on it; i'rab roots the sentence at the
-  المبتدأ, the first word. `nominal_verbal_predicate_01` is the eval case that catches this.
-  Asserted from the CATiB label definitions, **not yet verified against parser output** — confirm
-  against the eval set before writing the flip.
-- **Coordination stays a known gap**, as planned.
+**Re-rooting at token 1. That is the whole conversion.**
+
+The guidelines paper (Habash, Faraj & Roth 2009) carries worked trees for exactly the
+constructions the eval set tests. Checked against them, CATiB agrees with i'rab on every
+*internal* arc:
+
+| construction | CATiB, per the guidelines | vs i'rab |
+|---|---|---|
+| prepositional phrase | *"Prepositions always head their objects (OBJ)"* — Fig 1(h) | same |
+| idafa | `IDF` marks the possessor, so المضاف heads | same |
+| كان / إنّ | *"the topic/subject and complement/predicate are considered children of the incomplete verb with the relations SBJ and PRD"* — Figs 1(f), 1(g) | same |
+| adjective | `MOD` onto the noun — Fig 2(h) | same |
+| nominal sentence | *"the verbless complement/predicate (الخبر) heads the topic/subject (المبتدأ)"* — Fig 1(e) | **root differs** |
+| verbal particle | *"These particles always attach under the verb with the relation MOD"* — Fig 1(o) | **root differs** |
+
+Both disagreements are the same disagreement: CATiB roots at the predicate, i'rab at the first
+word of the sentence. So the conversion is a re-rooting — reverse the arcs on the path from token
+1 to the current root, leave every other governor alone. All thirteen tier-1 sentences come out
+equal to gold; five need no change at all, and the eight that do rewrite exactly two heads each.
+
+Three things fall out that are worth keeping:
+
+- **No labels are needed.** Re-rooting reads head integers only, which is fortunate, because
+  `Parse` carries none. Discarding `deprel` costs nothing here.
+- **Word order does the work a label could not.** CATiB gives the *same* tree to verb-initial
+  كتب الرجال الكتاب (Fig 1a) and topic-initial الرجال كتبوا الكتاب (Fig 1j). I'rab distinguishes
+  them, and re-rooting at token 1 separates them because it keys on position.
+- **The rule is a proxy, not the law.** The real principle is that العامل governs its معمول;
+  "first word" coincides with it across tier 1 because Arabic العامل normally precedes what it
+  governs. Tier 2 may separate them. Recorded now so a later failure is recognised rather than
+  debugged from scratch.
+
+  Why did we use rer-rooting?
+  Because the CATiB heads were checked against the eval set, and the eval set is checked against the gold. The gold is what the rule engine
+  expects. They prove that the code for choosing the heads is correct.
+
+
+### `parser_label` outlives the arc it described
+
+Re-rooting moves arcs but not labels, so on a re-rooted token the label describes an edge that no
+longer exists: in كتاب الطالب جديد, كتاب keeps `SBJ` while becoming the root. The label is kept
+anyway and the schema now says why — it stays useful *evidence* (`SBJ` argues for فاعل or مبتدأ
+however the tree was re-hung) and it is the strongest signal the parser hands the rule engine.
+Read as a property of the token, never as the name of an edge.
+
+### Coordination, now with a concrete failure mode
+
+Still a known gap, as planned, but the guidelines make the symptom specific: a sentence-initial و
+*"is attached to the head of the sub-tree that follows it with the relation MOD"*. Re-rooting at
+token 1 would therefore hang the whole sentence under a discourse connective. Recorded in the
+module docstring rather than patched — guessing at coordination here would be worse than leaving
+the failure visible.
 
 ---
 
