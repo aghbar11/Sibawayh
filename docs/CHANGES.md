@@ -52,6 +52,9 @@ Newest last.
 | 10 | "no overt agent" tested via `parser_label=SBJ` **or** `case=nom`, not case alone |
 | 10 | an `unknown` case blocks insertion — abstaining direction |
 | 10 | inserted token is `pos=pron`, not the plan's `S-`, following the eval set |
+| 11 | a rule's `when` returns its evidence, not a boolean — matching and evidence are one act |
+| 11 | the registry is constructed explicitly, never populated by import side effects |
+| 11 | rules take `(token, head, tokens)`; "sentence" is the token sequence, not a `Sentence` |
 
 Two edits were made directly to `CLAUDE.md`, both requested: the `prc0` bullet now records that
 `d3tok` splits ال and that folding it back is the rule, and the conventions section now
@@ -491,6 +494,75 @@ correctly shifted.
 Morphology in that test comes from gold rather than CAMeL. The structure is what is being
 asserted; the morphology layer has its own tests and its own recorded disagreements, and mixing
 them would make a failure ambiguous.
+
+---
+
+## Step 11 — rule engine skeleton
+
+### A rule returns its evidence, not a boolean
+
+The plan describes a rule as a predicate over `(token, head, sentence)` yielding
+`(irab_role, rule_id, evidence)`. Implemented so that `Rule.when` returns **the evidence list, or
+`None`** — matching and explaining are the same act.
+
+Splitting them would allow a rule to fire without being able to say why, and the `evidence` list
+is not decoration: CLAUDE.md specifies it as a list precisely because the hint ladder reveals it
+one item at a time, and the hint ladder is the product. A rule that cannot explain itself has
+nothing to teach.
+
+Evidence is ordered cheapest-observation-first, matching the ladder — locate, identify the عامل,
+name the role. `PREP_OBJECT` emits `head_pos=prep`, then `head_form=في`, then the case.
+
+### The registry is built, not discovered
+
+No decorator that registers on import. A registry that fills itself as modules happen to be
+imported makes rule *ordering* depend on import order, which is invisible in the source and
+miserable to debug — and ordering is load-bearing here, since first-match-wins means a general
+rule placed before a specific one silently shadows it.
+
+`Registry` is constructed from an explicit sequence, sorts on `(priority, id)` so ties are
+deterministic rather than insertion-ordered, and refuses duplicate ids: a repeated `rule_id` would
+make the field recorded on the token ambiguous, which defeats the point of recording it.
+
+### Abstention is a return value, not an exception
+
+`first_match` returns `None` when nothing fires, and `apply_rules` then returns that token
+**unchanged** — `irab_role` stays `None`, no `rule_id`, no `irab_role` key in `provenance`. There
+is deliberately no fallback rule and no default role. A token with no role is the normal, correct
+outcome for most tokens at this stage.
+
+### `(token, head, tokens)` rather than a `Sentence`
+
+The plan says "sentence"; the third argument is the token `Sequence`. Building a `Sentence` model
+would require the raw text, which this stage does not have and does not need, and every pipeline
+stage is `(list[Token]) -> list[Token]`. `head` is resolved for the rule and is `None` at the root,
+so a rule can tell the root apart from an unparsed token without doing the lookup itself.
+
+### Evidence accumulates across layers
+
+A rule appends to whatever earlier stages recorded rather than replacing it, so the inserted
+pronoun keeps `covert.py`'s note about *why it exists* and gains the rule's note about *what it
+is*. Gold's evidence lists in `data/eval/sentences.json` are therefore a subset of what the
+pipeline produces, not an exact target — they were written by hand, one layer at a time.
+
+### The two starter rules
+
+Chosen for being the least likely to need revising when the real inventory lands, and both are
+conclusions already earned elsewhere rather than new judgements:
+
+| rule | role | why it is safe |
+|---|---|---|
+| `COVERT_AGENT` | فاعل — ضمير مستتر | true by construction — `covert.py` inserts a pronoun *precisely when* a verb has no overt agent |
+| `PREP_OBJECT` | مجرور | true by definition — under Sibawayh convention the preposition is the عامل and heads its object |
+
+Both role strings are asserted equal to the gold ones. `COVERT_AGENT` keys on `inserted`, not on
+being a pronoun, so a typed هو is not its business.
+
+A test runs both rules across all thirteen eval sentences and asserts that **whatever fires agrees
+with gold**. Most tokens get nothing, which is correct at this stage. What must never happen is a
+confident wrong answer, and that is what the test pins.
+
+`apply_rules` is also the only place in the pipeline that writes `irab_role`.
 
 ---
 
