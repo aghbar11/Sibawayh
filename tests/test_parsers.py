@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
-from sibawayh.parsers import Parse, Parser, ParserError, attach
+from sibawayh.parsers import Formalism, Parse, Parser, ParserError, attach
 from sibawayh.schema import ROOT_HEAD, Sentence, Source, Token
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -20,6 +20,7 @@ class FixedParser(Parser):
     """Returns whatever it was handed. Stands in for a real backend."""
 
     name = "fixed"
+    formalism = Formalism.CATIB
 
     def __init__(self, parse: Parse) -> None:
         self.parse_result = parse
@@ -35,6 +36,7 @@ class GoldParser(Parser):
     that `attach` puts back exactly what a backend returns."""
 
     name = "gold"
+    formalism = Formalism.IRAB
 
     def parse(self, tokens: Sequence[Token]) -> Parse:
         return Parse.of([token.head or ROOT_HEAD for token in tokens])
@@ -118,12 +120,45 @@ def test_backends_are_shippable_unless_they_say_otherwise() -> None:
 def test_eval_only_is_declarable() -> None:
     class Licensed(Parser):
         name = "licensed"
+        formalism = Formalism.PADT
         eval_only = True
 
         def parse(self, tokens: Sequence[Token]) -> Parse:
             return Parse.of([0] * len(tokens))
 
     assert Licensed().eval_only is True
+
+
+# --- formalism ---------------------------------------------------------------------
+
+
+def test_formalism_must_be_declared() -> None:
+    """Unlike `eval_only`, this has no safe default — so it is refused outright.
+
+    A missing declaration would surface as wrongly normalized arcs in step 9,
+    which reads as a parsing bug. Failing at class definition keeps the error
+    where the omission is.
+    """
+    with pytest.raises(TypeError, match="must declare `formalism`"):
+
+        class Undeclared(Parser):
+            name = "undeclared"
+
+            def parse(self, tokens: Sequence[Token]) -> Parse:
+                return Parse.of([0] * len(tokens))
+
+
+def test_formalism_is_readable_without_naming_the_backend() -> None:
+    """Step 9 dispatches on this. It says what convention the arcs follow, not
+    which backend produced them — the firewall stays intact."""
+    assert FixedParser(Parse.of([])).formalism is Formalism.CATIB
+    assert GoldParser().formalism is Formalism.IRAB
+
+
+def test_formalism_values_cover_the_schemes_that_disagree() -> None:
+    """CLAUDE.md's table: i'rab, PADT analytical and UD differ structurally.
+    CATiB is the fourth, and what step 8's backend speaks."""
+    assert {f.value for f in Formalism} == {"catib", "ud", "padt", "irab"}
 
 
 # --- attach -----------------------------------------------------------------------

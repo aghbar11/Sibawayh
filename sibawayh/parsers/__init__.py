@@ -1,8 +1,10 @@
 """Parser backends behind a single interface.
 
 The licensing firewall lives here. A backend trained on LDC2018T08 is
-evaluation-only; a UD-based one is safe to ship. Nothing outside this package may
-know which one is running.
+evaluation-only. Nothing outside this package may know which one is running —
+but a backend does declare its `formalism`, because arc normalization has to
+know which convention the heads arrived in. That is a property of the answer,
+not the identity of who gave it.
 
 `Parser` is the component — tokens in, head indices out. `attach` is the pipeline
 stage that writes those heads onto tokens, and it is the only place that
@@ -10,19 +12,19 @@ bookkeeping happens, so backends cannot drift in how they do it.
 
     tokens = attach(tokens, parser)
 
-No backend exists yet. `FreeParser` lands with the Stanza work, `PadtParser` with
-the evaluation work, and the env-var gate that reads `Parser.eval_only` comes
-with the latter.
+No backend exists yet. The CATiB backend lands with step 8, `PadtParser` with the
+evaluation work, and the env-var gate that reads `Parser.eval_only` comes with
+the latter.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 
-from sibawayh.parsers.base import Parse, Parser, ParserError
+from sibawayh.parsers.base import Formalism, Parse, Parser, ParserError
 from sibawayh.schema import Source, Token
 
-__all__ = ["Parse", "Parser", "ParserError", "attach"]
+__all__ = ["Formalism", "Parse", "Parser", "ParserError", "attach"]
 
 
 def attach(tokens: Sequence[Token], parser: Parser) -> list[Token]:

@@ -23,12 +23,36 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from enum import StrEnum
 
 from sibawayh.schema import ROOT_HEAD, Token
 
 
 class ParserError(RuntimeError):
     """A parser could not produce a usable attachment."""
+
+
+class Formalism(StrEnum):
+    """The annotation convention a set of arcs follows.
+
+    Heads are integers, so a `Parse` alone does not say what convention produced
+    them — and the conventions disagree structurally, not just in vocabulary. UD
+    makes a preposition a dependent of its object; CATiB and PADT make it the
+    head; i'rab roots a nominal sentence at the مبتدأ where the others root it at
+    the predicate.
+
+    A backend declares which one it speaks so arc normalization can dispatch
+    instead of assuming. That is what keeps a second backend costing one
+    normalizer rather than a rewrite.
+    """
+
+    CATIB = "catib"
+    UD = "ud"
+    PADT = "padt"
+    """Prague analytical functions — step 22's evaluation-only backend."""
+
+    IRAB = "irab"
+    """Not a backend's answer but the target: what arc normalization produces."""
 
 
 @dataclass(frozen=True)
@@ -86,6 +110,11 @@ class Parser(ABC):
     `eval_only` marks a backend whose training data forbids shipping. It is a
     declaration, not yet an enforcement — the gate that reads it arrives with the
     backend that needs it.
+
+    `formalism` says which annotation convention the returned heads follow. Two
+    declarations, two different consumers: the licence gate reads one, arc
+    normalization reads the other. Neither tells a caller *which backend* is
+    running, which stays private to this package.
     """
 
     name: str = "parser"
@@ -94,10 +123,27 @@ class Parser(ABC):
     """True when this backend may never reach production. See `docs/PLAN.md`
     under data assets: a model trained on PADT inherits PADT's licence."""
 
+    formalism: Formalism
+    """The convention the heads follow. Deliberately has no default: a wrong
+    guess here silently mis-normalizes every arc, and there is no honest default
+    to guess. Subclasses must say, and `__init_subclass__` enforces it."""
+
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        """Reject a backend that does not declare its formalism.
+
+        Failing at class-definition time rather than at first attribute access
+        matters here: the symptom of a missing declaration would otherwise be
+        wrongly normalized arcs somewhere downstream, which looks like a parsing
+        bug rather than a missing line.
+        """
+        super().__init_subclass__(**kwargs)
+        if getattr(cls, "formalism", None) is None:
+            raise TypeError(f"{cls.__name__} must declare `formalism`")
+
     @abstractmethod
     def parse(self, tokens: Sequence[Token]) -> Parse:
         """Head indices for `tokens`, one per token, in order."""
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
         gate = ", eval_only" if self.eval_only else ""
-        return f"<{type(self).__name__} {self.name}{gate}>"
+        return f"<{type(self).__name__} {self.name} {self.formalism}{gate}>"

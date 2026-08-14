@@ -36,6 +36,10 @@ Newest last.
 | 7 | `parse` returns a self-validating `Parse`, not a bare `list[int]` |
 | 7 | parser is a component; `attach` is the stage that applies its result |
 | 2 | `Token.arc_confidence` added — step 14's input had nowhere to live |
+| 8 | backend is CamelParser's CATiB model, not Stanza — Stanza's Arabic model is non-commercial |
+| 8 | CATiB labels kept in `parser_label` as evidence; still discarded for role derivation |
+| 7 | `Parser.formalism` added so step 9 can dispatch instead of assuming one convention |
+| 9 | arc normalization is per-formalism, not a single UD-shaped pass |
 
 Two edits were made directly to `CLAUDE.md`, both requested: the `prc0` bullet now records that
 `d3tok` splits ال and that folding it back is the rule, and the conventions section now
@@ -188,6 +192,94 @@ shippable. That is the right default for the free parser and the wrong failure m
 licensed one. Step 22 must declare `eval_only` deliberately and not rely on the default catching
 a mistake.
 
+**Amended before step 8.** `Parser.formalism` added — see step 9 below.
+
+---
+
+## parser backend: CATiB, not UD
+
+### Why not Stanza.
+
+I thought that Stanza was *"MIT-licensed, trained on a free Arabic treebank, and therefore
+safe to ship."* It is not. Stanza is Apache 2.0, but its Arabic model is trained on UD_Arabic-PADT, which is
+**CC BY-NC-SA 3.0** — non-commercial.
+
+ It is the same corpus the whole `parsers/` firewall exists to quarantine, wearing
+a different licence. Stanza was never the escape hatch from the PADT problem.
+
+### Why not the UD model from the same lab
+
+`CAMeL-Lab/camelbert-ud-parser` is MIT and shares CamelParser's ecosystem, so it looked like the
+way to keep UD as a future formalism. It is trained on NUDAR (UD_Arabic-NYUAD), which is
+CC BY-SA 4.0 but ships **no word forms** — *"The underlying text is not included; the user must
+obtain it separately"* — meaning LDC PATB. Same encumbrance, one step further away.
+
+The question that settles it is what a future self-trained parser would train *on*:
+
+| corpus | formalism | licence | text included? | size |
+|---|---|---|---|---|
+| UD_Arabic-PADT | UD | CC BY-NC-SA 3.0 | yes | 7.7k sentences |
+| UD_Arabic-NYUAD | UD | CC BY-SA 4.0 | **no** — needs LDC PATB | 19.7k sentences |
+| UD_Arabic-PUD | UD | permissive | yes | 1k sentences, test only |
+| CamelTB | CATiB | open | yes | 188k words |
+
+There is no openly-licensed, training-sized Arabic UD treebank that ships its own text. **CamelTB
+is the only free training corpus, and it is CATiB.** Committing to UD as the long-term formalism
+would guarantee the licensing problem rather than avoid it.
+
+In the future, I will train a CATiB parser on CamelTB alone. I think it will be shippable. Until then, we will use
+the existing CamelParser CATiB model, which is MIT-licensed and trained on CamelTB + PATB. The
+
+### Why CATiB suits i'rab better anyway
+
+CATiB has eight labels: `SBJ`, `OBJ`, `TPC`, `PRD`, `IDF`, `TMZ`, `MOD`, `---`. The definitions
+are traditional-grammar-shaped:
+
+- `OBJ` is *"object of verb, **preposition**, or deverbal noun"* — the preposition is the head,
+  which is i'rab's convention and the opposite of UD's `case`.
+- `IDF` is the idafa relation directly. `TMZ` is tamyiz directly.
+
+### What this does not change
+
+**The rule engine is unaffected in scope.
+
+| CATiB | i'rab roles it collapses | discriminator |
+|---|---|---|
+| `SBJ` | فاعل · نائب فاعل · مبتدأ · اسم كان | head POS, **voice**, head lemma |
+| `OBJ` | مفعول به · اسم مجرور · مضاف إليه | head POS |
+| `PRD` | خبر كان · خبر إنّ | head lemma — inverse case patterns |
+| `MOD` | صفة · حال · ظرف · جار ومجرور · بدل · توكيد | **definiteness**, case, POS |
+| `IDF` / `TMZ` | مضاف إليه · تمييز | — 1:1 |
+
+Every discriminator in the right column is morphology, not attachment, and no parser in any
+formalism can see them. `verbal_passive_01` is `SBJ` either way; `vox=p` is what makes it نائب
+فاعل. Nor do labels supply abstention, the `evidence` lists the hint ladder is built from, or
+covert pronouns.
+---
+
+## Step 9 — arc normalization becomes per-formalism
+
+The plan describes one pass flipping UD conventions. It ships as a dispatch on the formalism the
+backend declares, with a CATiB normalizer written now and a UD one only if a UD backend ever
+lands.
+
+`Parser.parse` returns head integers, so it is already formalism-agnostic and does not change.
+`arcs.py` is the only module that cannot be — flipping arcs means knowing what convention they
+arrived in. Hard-wiring one convention there is the actual lock-in risk, and it exists whichever
+formalism is chosen first. `Parser.formalism` (step 7, amended) is what the dispatch reads.
+
+Cost of a future UD backend: one normalizer module. Nothing else moves.
+
+What the CATiB normalizer has to do is **smaller than the UD job but not empty**:
+
+- **Prepositions need no flip.** `OBJ` already puts the preposition at the head.
+- **Nominal sentences need re-rooting.** CATiB's `SBJ` covers *"topic of simple nominal
+  sentence"*, so the predicate heads and the topic depends on it; i'rab roots the sentence at the
+  المبتدأ, the first word. `nominal_verbal_predicate_01` is the eval case that catches this.
+  Asserted from the CATiB label definitions, **not yet verified against parser output** — confirm
+  against the eval set before writing the flip.
+- **Coordination stays a known gap**, as planned.
+
 ---
 
 ## Data assets — what they are, and what we may do with them
@@ -213,6 +305,14 @@ level only. No sentences, no trees. Two exist for MSA and they **compete**; pick
 which word governs which, and what the relation is called. Labeled *examples*, not a dictionary.
 
 - PADT / LDC2018T08 — not yet obtained.
+- CamelTB — open, CATiB-annotated, 188k words. Not yet obtained; relevant to a future
+  cleanly-licensed parser, not to any current step.
+
+**Parser model** — a third category, and the one that carries licences forward. Weights, not data
+and not a lexicon. What matters about a model is the corpus it *saw*, which its file does not
+record.
+
+- `camelbert-catib-parser` — step 8's backend.
 
 The category difference is the point. No morphology database knows that الطالب attaches to كتب;
 that information exists only in annotated sentences. Which is why they land in different steps:
@@ -224,7 +324,11 @@ that information exists only in annotated sentences. Which is why they land in d
 |---|---|---|
 | `morphology-db-msa-r13` (installed) | GPL v2 | yes, with GPL obligations |
 | `disambig-mle-calima-msa-r13` (installed) | GPL v2 | yes, with GPL obligations |
+| `camelbert-catib-parser` (step 8) | MIT weights, trained on CamelTB + PATB | probably — see step 8 |
+| CamelTB (not obtained) | open | yes |
 | `morphology-db-msa-s31` (**not** installed) | LDC restricted | no |
+| UD_Arabic-PADT (Stanza's training data) | CC BY-NC-SA 3.0 | **no — non-commercial** |
+| UD_Arabic-NYUAD | CC BY-SA 4.0, text withheld | no — text requires LDC PATB |
 | PADT / LDC2018T08 (not yet obtained) | LDC Reduced-License | no — **and neither can a model trained on it** |
 
 **LDC is an organization, not a licence.** The Linguistic Data Consortium distributes hundreds of
@@ -254,4 +358,7 @@ deploy; PADT contaminates anything *derived* from it. That is what step 22's env
 and why step 7 builds the interface before either backend exists.
 
 **Standing rules.** Only ever install `-r13`. Read the `LICENSE` file inside a package; ignore the
-publisher's name on the copyright line.
+publisher's name on the copyright line. For a *model*, the licence on the weights is only half the
+answer — find what corpus it was trained on and check that too. Step 8 turned on exactly this:
+Stanza is Apache-licensed software whose Arabic model is trained on non-commercial data, and
+nothing in the install tells you so.
