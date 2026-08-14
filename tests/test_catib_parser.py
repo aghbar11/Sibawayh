@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 from sibawayh.arcs import normalize_arcs
+from sibawayh.covert import insert_covert_pronouns
 from sibawayh.parsers import Formalism, Parser, ParserError, attach
 from sibawayh.parsers.catib import MODEL_DIR_ENV, CatibParser, is_available, model_dir
 from sibawayh.schema import ROOT_HEAD, Sentence, Source, Token
@@ -135,3 +136,32 @@ def test_end_to_end_reaches_the_gold_tree(raw: dict) -> None:
     assert any(token.provenance.get("head") is Source.PARSER for token in normalized) or all(
         token.provenance.get("head") is Source.ARCS for token in normalized
     )
+
+
+@pytest.mark.parser
+@needs_model
+@pytest.mark.parametrize("raw", EVAL, ids=[s["id"] for s in EVAL])
+def test_end_to_end_including_the_covert_pronoun(raw: dict) -> None:
+    """The whole structural pipeline: parse -> attach -> arcs -> covert.
+
+    Compared against gold *with* the inserted token, so `nominal_verbal_predicate_01`
+    has to come out at four tokens with the ids shifted. Morphology is taken from
+    gold rather than CAMeL: this asserts the structure is right, and the
+    morphology layer has its own tests and its own known disagreements.
+    """
+    gold = Sentence.model_validate(raw).tokens
+    surface = [token for token in gold if not token.inserted]
+
+    parser = CatibParser()
+    bare = [Token(id=i, form=t.form) for i, t in enumerate(surface, start=1)]
+    parsed = normalize_arcs(attach(bare, parser), parser.formalism)
+    carried = [
+        token.model_copy(update={"pos": source.pos, "feats": source.feats})
+        for token, source in zip(parsed, surface, strict=True)
+    ]
+    result = insert_covert_pronouns(carried)
+
+    assert [token.id for token in result] == [token.id for token in gold]
+    assert [token.head for token in result] == [token.head for token in gold]
+    assert [token.form for token in result] == [token.form for token in gold]
+    assert [token.inserted for token in result] == [token.inserted for token in gold]

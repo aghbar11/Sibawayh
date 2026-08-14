@@ -49,6 +49,9 @@ Newest last.
 | 8 | `parser` extra is `supar`+`torch`, not `stanza`; `camel_parser` not used at all |
 | 8 | `CatibParser.labels()` sits outside the `Parser` interface |
 | 9 | CATiB fixture upgraded from hand-derived to verified against the real model |
+| 10 | "no overt agent" tested via `parser_label=SBJ` **or** `case=nom`, not case alone |
+| 10 | an `unknown` case blocks insertion — abstaining direction |
+| 10 | inserted token is `pos=pron`, not the plan's `S-`, following the eval set |
 
 Two edits were made directly to `CLAUDE.md`, both requested: the `prc0` bullet now records that
 `d3tok` splits ال and that folding it back is the rule, and the conventions section now
@@ -403,7 +406,7 @@ Three things fall out that are worth keeping:
   governs. Tier 2 may separate them. Recorded now so a later failure is recognised rather than
   debugged from scratch.
 
-  Why did we use rer-rooting?
+  Why did we use re-rooting?
   Because the CATiB heads were checked against the eval set, and the eval set is checked against the gold. The gold is what the rule engine
   expects. They prove that the code for choosing the heads is correct.
 
@@ -423,6 +426,71 @@ Still a known gap, as planned, but the guidelines make the symptom specific: a s
 token 1 would therefore hang the whole sentence under a discourse connective. Recorded in the
 module docstring rather than patched — guessing at coordination here would be worse than leaving
 the failure visible.
+
+---
+
+## Step 10 — covert pronoun insertion
+
+### The test for "no overt agent" uses two signals, not one
+
+The plan says *"for each verb with no overt agent among its dependents"*, and leaves open how a
+stage that runs **before** the rule engine is supposed to know which dependent is the agent. It
+cannot read `irab_role`; nothing has written one yet.
+
+Two signals are used, and **either** is enough to block insertion:
+
+* `parser_label == "SBJ"` — CATiB's own judgement, *"the explicit subject of a verb, active or
+  passive"*
+* `case == nom` — the morphological signal
+
+The redundancy is the point. Step 5 already recorded that CAMeL reads الرجل in
+`verbal_overt_agent_01` as **accusative**; on case alone that sentence would gain a ضمير مستتر
+next to a subject the student can plainly see. The parser's `SBJ` catches it. A parser mislabel is
+caught the other way round.
+
+**A dependent whose case is `unknown` also blocks insertion.** That is the abstaining direction
+CLAUDE.md asks for: an unreadable case might be the agent, and asserting a covert pronoun where
+none exists is a worse failure than omitting one. It costs recall on undiacritized input, which is
+the right trade for a teaching tool.
+
+**Passive needs no special case.** نائب فاعل is nominative, so it registers as a candidate through
+the same test — `verbal_passive_01` is skipped without the stage ever looking at `voice`.
+
+### `pos` is `pron`, not `S-`
+
+The plan says to insert with `pos: S-`. That is a Buckwalter-style tag and not in our `Pos` set;
+`data/eval/sentences.json`, which is the spec, uses `pron`. Followed the eval set.
+
+### What the stage does and does not set
+
+`form`, `pos`, `feats`, `head`, `inserted`, `evidence` and `provenance` — all stamped `covert`.
+**`irab_role` stays empty.** Gold names the token فاعل — ضمير مستتر, but naming is the rule
+engine's job and this stage has no business pre-empting it.
+
+Person, gender and number are copied from the verb; `case` is set to `nom`, since an agent is
+nominative by definition and a verb has no case to copy. Aspect, mood, voice and state are
+explicitly *cleared* — a pronoun has none of them, and leaving them on would give the renderer
+nonsense to describe.
+
+The form is the pronoun agreeing with the verb (هو / هي / هم / هن / أنا / نحن / أنت / هما), always
+suffixed `*`, so a token we invented can never be mistaken for one the student typed.
+
+### The stage is idempotent, and that took a fix
+
+The first version excluded already-inserted tokens when scanning for a candidate agent, so a
+second pass saw the verb as agentless again and gave it a second pronoun. Backwards: an inserted
+pronoun **is** the agent, and now counts as one. A test pins it.
+
+### End to end
+
+`pytest -m parser` now runs the full structural chain on the real model —
+parse → attach → arc normalization → covert insertion — against gold *including* the inserted
+token. **13 of 13**, with `nominal_verbal_predicate_01` coming out at four tokens and the ids
+correctly shifted.
+
+Morphology in that test comes from gold rather than CAMeL. The structure is what is being
+asserted; the morphology layer has its own tests and its own recorded disagreements, and mixing
+them would make a failure ambiguous.
 
 ---
 
@@ -453,8 +521,7 @@ which word governs which, and what the relation is called. Labeled *examples*, n
   cleanly-licensed parser, not to any current step.
 
 **Parser model** — a third category, and the one that carries licences forward. Weights, not data
-and not a lexicon. What matters about a model is the corpus it *saw*, which its file does not
-record.
+and not a lexicon (weights come from checkpoint in the model directory). 
 
 - `camelbert-catib-parser` — step 8's backend.
 
@@ -475,10 +542,6 @@ that information exists only in annotated sentences. Which is why they land in d
 | UD_Arabic-NYUAD | CC BY-SA 4.0, text withheld | no — text requires LDC PATB |
 | PADT / LDC2018T08 (not yet obtained) | LDC Reduced-License | no — **and neither can a model trained on it** |
 
-**LDC is an organization, not a licence.** The Linguistic Data Consortium distributes hundreds of
-corpora under different terms — some members-only, some GPL. All four rows above are
-LDC-published. Only the first two are free. Reading "LDC" as "forbidden" would rule out the
-Buckwalter database for no reason at all.
 
 The installed packages both carry this header in their `LICENSE` file:
 
