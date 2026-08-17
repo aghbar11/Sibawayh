@@ -1,7 +1,5 @@
 """Pydantic models for tokens, analyses and sentences.
 
-Three models, as laid out in CLAUDE.md:
-
 * `Features` / `Token` — one word (or inserted covert pronoun) with its morphology,
   its head, and the role the rule engine derived for it.
 * `Analysis` — one *candidate reading* of a token. The CAMeL disambiguator returns a

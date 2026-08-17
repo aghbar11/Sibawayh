@@ -36,6 +36,7 @@ so the abstention layer can see how thin the win was.
 
 from __future__ import annotations
 
+import os
 import re
 from collections.abc import Mapping, Sequence
 from typing import Any
@@ -514,24 +515,73 @@ def sentence_from_analyses(
 # --- the live call ---------------------------------------------------------------
 
 
+BERT = "bert"
+"""Context-aware. Reads the whole sentence before choosing a reading."""
+
+MLE = "mle"
+"""Maximum-likelihood. Chooses each word's commonest reading in isolation."""
+
+DEFAULT_DISAMBIGUATOR = BERT
+
+DISAMBIGUATOR_ENV = "SIBAWAYH_DISAMBIGUATOR"
+"""Set to `mle` to fall back — useful when the 445MB BERT data is absent."""
+
+
+class DisambiguatorError(MorphologyError):
+    """The requested disambiguator could not be loaded."""
+
+
 class CamelMorphology:
     """The MSA disambiguator, wrapped.
 
-    Loading the model is deferred to the first `analyze` call: importing this
-    module must not require the CAMeL data to be installed.
+    Two are available, and the choice matters more than anything else in this
+    module. `mle` picks each word's commonest reading **in isolation**, so on a
+    short undiacritized sentence it reads الرجل in يأكل الرجل السمك as accusative
+    and the rule engine then calls the فاعل a مفعول به. `bert` reads the whole
+    sentence and gets it right. Every case error measured against the eval set
+    was an MLE error, and none survived the switch.
+
+    The cost is size and speed: 445MB of model data, and inference rather than a
+    table lookup. `mle` stays reachable through `$SIBAWAYH_DISAMBIGUATOR` for
+    environments where that is too much, on the understanding that its case
+    output cannot be trusted on short input.
+
+    Loading is deferred to the first `analyze` call: importing this module must
+    not require the CAMeL data to be installed.
     """
 
-    def __init__(self, top: int = DEFAULT_TOP) -> None:
+    def __init__(self, top: int = DEFAULT_TOP, kind: str | None = None) -> None:
         self.top = top
+        self.kind = (kind or os.environ.get(DISAMBIGUATOR_ENV) or DEFAULT_DISAMBIGUATOR).lower()
+        if self.kind not in {BERT, MLE}:
+            raise DisambiguatorError(
+                f"unknown disambiguator {self.kind!r}; expected {BERT} or {MLE}"
+            )
         self._disambiguator: Any = None
 
     @property
     def disambiguator(self) -> Any:
         if self._disambiguator is None:
+            self._disambiguator = self._load()
+        return self._disambiguator
+
+    def _load(self) -> Any:
+        if self.kind == MLE:
             from camel_tools.disambig.mle import MLEDisambiguator
 
-            self._disambiguator = MLEDisambiguator.pretrained(top=self.top)
-        return self._disambiguator
+            return MLEDisambiguator.pretrained(top=self.top)
+
+        from camel_tools.disambig.bert import BERTUnfactoredDisambiguator
+
+        try:
+            return BERTUnfactoredDisambiguator.pretrained(top=self.top)
+        except Exception as error:  # pragma: no cover - depends on local data
+            raise DisambiguatorError(
+                "could not load the BERT disambiguator. Install it with "
+                "`camel_data -i disambig-bert-unfactored-msa`, or set "
+                f"${DISAMBIGUATOR_ENV}=mle to fall back — but note that MLE's case "
+                "output is unreliable on short undiacritized input."
+            ) from error
 
     def analyze(
         self,
@@ -557,7 +607,7 @@ class CamelMorphology:
         return sentence_from_analyses(text, ranked, sentence_id=sentence_id)
 
 
-def analyze(text: str, top: int = DEFAULT_TOP, **kwargs: Any) -> Sentence:
+def analyze(text: str, top: int = DEFAULT_TOP, kind: str | None = None, **kwargs: Any) -> Sentence:
     """Convenience wrapper. Loads a fresh model each call — fine for a one-shot
     CLI, wasteful in a loop; hold a `CamelMorphology` instead."""
-    return CamelMorphology(top=top).analyze(text, **kwargs)
+    return CamelMorphology(top=top, kind=kind).analyze(text, **kwargs)

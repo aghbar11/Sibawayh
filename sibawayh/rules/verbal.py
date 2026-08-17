@@ -65,7 +65,12 @@ def _verb_form(aspect: Aspect | None, mood: Mood | None, voice: Voice | None):
             return None
         if is_defective_verb(token) or _governs_a_predicate(token, tokens):
             return None
-        if aspect is not None and token.feats.aspect is not aspect:
+        # CAMeL fills `mood` on perfect verbs too — كتب comes back
+        # aspect=perfect *and* mood=indicative — so a rule keyed on mood alone
+        # would claim a past-tense verb as مضارع. Aspect is checked either way.
+        if aspect is Aspect.PERFECT and token.feats.aspect is not Aspect.PERFECT:
+            return None
+        if aspect is Aspect.IMPERFECT and token.feats.aspect is Aspect.PERFECT:
             return None
         if mood is not None and token.feats.mood is not mood:
             return None
@@ -131,7 +136,7 @@ VERB_IMPERFECT_INDICATIVE = Rule(
     id="VERB_IMPERFECT_INDICATIVE",
     role="فعل مضارع مرفوع",
     priority=100,
-    when=_verb_form(None, Mood.INDICATIVE, Voice.ACTIVE),
+    when=_verb_form(Aspect.IMPERFECT, Mood.INDICATIVE, Voice.ACTIVE),
     description="An imperfect verb with nothing governing its mood.",
 )
 
@@ -139,7 +144,7 @@ VERB_IMPERFECT_SUBJUNCTIVE = Rule(
     id="VERB_IMPERFECT_SUBJUNCTIVE",
     role="فعل مضارع منصوب",
     priority=100,
-    when=_verb_form(None, Mood.SUBJUNCTIVE, Voice.ACTIVE),
+    when=_verb_form(Aspect.IMPERFECT, Mood.SUBJUNCTIVE, Voice.ACTIVE),
     description="An imperfect verb put in the subjunctive by a ناصب such as لن.",
 )
 
@@ -147,7 +152,7 @@ VERB_IMPERFECT_JUSSIVE = Rule(
     id="VERB_IMPERFECT_JUSSIVE",
     role="فعل مضارع مجزوم",
     priority=100,
-    when=_verb_form(None, Mood.JUSSIVE, Voice.ACTIVE),
+    when=_verb_form(Aspect.IMPERFECT, Mood.JUSSIVE, Voice.ACTIVE),
     description="An imperfect verb put in the jussive by a جازم such as لم.",
 )
 

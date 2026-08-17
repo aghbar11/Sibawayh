@@ -31,13 +31,24 @@ from sibawayh.schema import Aspect, Case, Pos, Token
 NOMINAL = frozenset({Pos.NOUN, Pos.PROPN, Pos.PRON, Pos.ADJ})
 
 
-def _argument_of(vocabulary: frozenset[str], case: Case, head_pos: Pos, family: str):
+PARTICLE_POS = frozenset({Pos.PART, Pos.CONJ})
+"""What إنّ can come back tagged as.
+
+It is a حرف مشبه بالفعل, so `part` is the expected tag — but the BERT
+disambiguator reads إنّ as `conj_sub`, which our collapse table maps to `conj`,
+however, أنّ really does subordinate. Accepting either
+keeps the rule working whichever analyser is in use, and the lemma check is what
+actually identifies the family.
+"""
+
+
+def _argument_of(vocabulary: frozenset[str], case: Case, head_pos: frozenset[Pos], family: str):
     """Build the predicate for one argument of one ناسخ family."""
 
     def when(token: Token, head: Token | None, tokens: Sequence[Token]) -> Evidence | None:
         if token.pos not in NOMINAL:
             return None
-        if head is None or head.pos is not head_pos or not lemma_in(head, vocabulary):
+        if head is None or head.pos not in head_pos or not lemma_in(head, vocabulary):
             return None
         if token.feats.case is not case:
             return None
@@ -73,7 +84,7 @@ KANA_SUBJECT = Rule(
     id="KANA_SUBJECT",
     role="اسم كان",
     priority=55,
-    when=_argument_of(KANA_AND_SISTERS, Case.NOM, Pos.VERB, "kana_sisters"),
+    when=_argument_of(KANA_AND_SISTERS, Case.NOM, frozenset({Pos.VERB}), "kana_sisters"),
     description="The nominative argument of كان — raised, where a complete verb's would be فاعل.",
 )
 
@@ -81,7 +92,7 @@ KANA_PREDICATE = Rule(
     id="KANA_PREDICATE",
     role="خبر كان",
     priority=55,
-    when=_argument_of(KANA_AND_SISTERS, Case.ACC, Pos.VERB, "kana_sisters"),
+    when=_argument_of(KANA_AND_SISTERS, Case.ACC, frozenset({Pos.VERB}), "kana_sisters"),
     description="The accusative argument of كان — its خبر, not a مفعول به.",
 )
 
@@ -89,7 +100,7 @@ INNA_SUBJECT = Rule(
     id="INNA_SUBJECT",
     role="اسم إنّ",
     priority=55,
-    when=_argument_of(INNA_AND_SISTERS, Case.ACC, Pos.PART, "inna_sisters"),
+    when=_argument_of(INNA_AND_SISTERS, Case.ACC, PARTICLE_POS, "inna_sisters"),
     description="The accusative argument of إنّ — the inverse of كان's pattern.",
 )
 
@@ -97,7 +108,7 @@ INNA_PREDICATE = Rule(
     id="INNA_PREDICATE",
     role="خبر إنّ",
     priority=55,
-    when=_argument_of(INNA_AND_SISTERS, Case.NOM, Pos.PART, "inna_sisters"),
+    when=_argument_of(INNA_AND_SISTERS, Case.NOM, PARTICLE_POS, "inna_sisters"),
     description="The nominative argument of إنّ — its خبر, not its اسم.",
 )
 

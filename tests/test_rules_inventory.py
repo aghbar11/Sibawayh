@@ -289,6 +289,75 @@ def test_specific_rules_outrank_general_ones(specific: str, general: str) -> Non
     assert ordered.index(specific) < ordered.index(general)
 
 
+@pytest.mark.parametrize("raw", EVAL, ids=EVAL_IDS)
+def test_no_two_rules_at_the_same_priority_both_match(raw: dict) -> None:
+    """The invariant the perfect-verb bug broke.
+
+    `Registry` sorts on `(priority, id)`, so when two rules share a priority the
+    winner is decided **alphabetically**. That is deterministic but arbitrary:
+    `VERB_IMPERFECT_INDICATIVE` beat `VERB_PERFECT_ACTIVE` on `I` before `P`,
+    and named a past-tense verb مضارع. Renaming either rule would have changed
+    the answer.
+
+    Overlap is fine where a real priority gap decides it — `COVERT_AGENT` (10)
+    is meant to outrank `VERBAL_AGENT` (110). What must never happen is two
+    rules tying and the spelling breaking the tie.
+    """
+    registry = list(default_registry())
+    tokens = Sentence.model_validate(raw).tokens
+    for token in tokens:
+        head = next((t for t in tokens if t.id == token.head), None)
+        matched = [rule for rule in registry if rule(token, head, tokens) is not None]
+        priorities = [rule.priority for rule in matched]
+        assert len(priorities) == len(set(priorities)), (
+            f"{token.form}: {[(r.id, r.priority) for r in matched]} — "
+            "tied priority, so the alphabet picks the answer"
+        )
+
+
+def test_no_tie_on_morphology_as_camel_actually_returns_it() -> None:
+    """The gold-driven test above cannot catch the bug that motivated it.
+
+    Gold sets `aspect` **or** `mood` on a verb, never both, so a rule keyed on
+    mood alone simply does not fire on gold data. CAMeL sets both — كتب comes
+    back `aspect=perfect` *and* `mood=indicative` — and that is what created the
+    tie. So the tie check has to run on a token shaped the way the analyser
+    really shapes it, not the way the eval set is written.
+    """
+    verb = Token(
+        id=1,
+        form="كتب",
+        pos=Pos.VERB,
+        head=0,
+        feats=Features(aspect="perfect", mood="indicative", voice="active"),
+    )
+    matched = [rule for rule in default_registry() if rule(verb, None, [verb]) is not None]
+    priorities = [rule.priority for rule in matched]
+    assert len(priorities) == len(set(priorities)), [(r.id, r.priority) for r in matched]
+    assert apply_rules([verb])[0].irab_role == "فعل ماضٍ"
+
+
+def test_the_only_overlap_is_the_intended_one() -> None:
+    """Records which tokens more than one rule claims, so a new overlap shows up
+    as a test failure rather than as a silently different answer."""
+    registry = list(default_registry())
+    overlapping = []
+    for raw in EVAL:
+        tokens = Sentence.model_validate(raw).tokens
+        for token in tokens:
+            head = next((t for t in tokens if t.id == token.head), None)
+            matched = [rule.id for rule in registry if rule(token, head, tokens) is not None]
+            if len(matched) > 1:
+                overlapping.append((raw["id"], token.form, sorted(matched)))
+    assert overlapping == [
+        (
+            "nominal_verbal_predicate_01",
+            "هو*",
+            ["COVERT_AGENT", "VERBAL_AGENT"],
+        )
+    ]
+
+
 def test_prep_object_outranks_everything_that_could_shadow_it() -> None:
     ordered = [rule.id for rule in default_registry()]
     assert ordered.index("PREP_OBJECT") < ordered.index("IDAFA_ANNEXED")

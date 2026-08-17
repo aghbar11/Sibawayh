@@ -55,6 +55,12 @@ Newest last.
 | 11 | a rule's `when` returns its evidence, not a boolean — matching and evidence are one act |
 | 11 | the registry is constructed explicitly, never populated by import side effects |
 | 11 | rules take `(token, head, tokens)`; "sentence" is the token sequence, not a `Sentence` |
+| 5 | default disambiguator is BERT, not MLE — MLE's case output is unusable on short input |
+| 12 | perfect verbs were being named مضارع; the imperfect rules now assert aspect too |
+| 5 | مضارع is never classified — `mood` is unavailable from morphology, fix is syntactic |
+| 12 | `nawasikh.py` and `particles.py` accept `conj` as well as `part` for إنّ |
+| 2 | `gen: b` / `num: b` are declared by CAMeL but never observed — correction |
+| — | `docs/REFERENCE.md` added — every field and value, generated from `schema.py` |
 | 12 | `rules/lexicon.py` added — closed-class word lists, matched diacritic-insensitively |
 | 12 | one rule per verb form rather than one rule with a computed role string |
 | 12 | verbal rules exclude النواسخ themselves rather than deferring to a file that does not exist |
@@ -73,10 +79,28 @@ departures from it, which is why they live there and not only here.
 
 **Amended during step 5.** `Gender` gained `BOTH` and `UNKNOWN`; `Number` gained `BOTH`.
 
-CAMeL's real inventories are `gen: b f m na u` and `num: b d na p s u`. Without those members
+CAMeL's `db.defines` declares `gen: b f m na u` and `num: b d na p s u`. Without those members
 `b` and `u` had nowhere to go, and folding them into `null` would have destroyed the `na` vs `u`
 distinction CLAUDE.md calls load-bearing. Additive only — no existing value changed, the eval
 set was unaffected.
+
+**Corrected later.** The wording above originally said these were CAMeL's "real inventories",
+implying `b` had been encountered. It had not. Scanning **all 74,014 entries** in
+`morphology-db-msa-r13` — stem, prefix and suffix tables — finds:
+
+    gen  {'-': 64639, 'm': 4474, 'f': 3582, None: 1280, 'u': 39}
+    num  {'-': 65984, 'p': 6617, None: 1280, 's': 91, 'd': 26, 'u': 14, ...}
+
+Zero occurrences of `b` in either. So `Gender.BOTH` and `Number.BOTH` are justified
+**defensively** — the schema declares the value legal and `morphology-db-msa-s31` may use it —
+not by observation. `UNKNOWN` on both is earned: `u` really does occur.
+
+Two things the scan turned up incidentally. `num` contains one entry valued `'؛'` (an Arabic
+semicolon) and one valued `'pf'`; neither is a legal value, and either would raise
+`MorphologyError` out of `_lookup` if it ever surfaced — a latent crash rather than a wrong
+answer, unhandled. And `-` is not the oddity step 5 treats it as: at 64,639 of 74,014 it is the
+commonest value in the database by a factor of fourteen. The handling is right; the framing
+understates it.
 
 **Amended during step 7.** `Token.arc_confidence` added.
 
@@ -694,6 +718,95 @@ label agrees with gold. Abstaining is fine; contradicting gold is not. Alongside
 gets no role (CLAUDE.md's first trap), every sister of كان is excluded, a `PRD` dependent blocks
 the verb rules, and `COVERT_AGENT` and `PASSIVE_AGENT` are both verified to outrank the general
 `VERBAL_AGENT` — first-match-wins makes that ordering load-bearing rather than cosmetic.
+
+---
+
+## Amendment to the disambiguator. Disambiguator is now BERT, not MLE
+
+Before, we installed `disambig-mle-calima-msa-r13` and later tested all passed, so the morphology
+layer looked finished. It was not. Running the **whole pipeline on real morphology** rather than
+on the eval set's gold features told a different story:
+
+| morphology | correct | **wrong** | abstained | of |
+|---|---:|---:|---:|---:|
+| gold — what the tests use | 40 | **0** | 0 | 40 |
+| MLE — what a live demo uses | 8 | **6** | 27 | 41 |
+| **BERT** | **29** | **4** | 8 | 41 |
+
+The gold row is what every test in the suite measures, and it is honest about the *rules*. It says
+nothing about what a student typing a sentence would see, which is the middle row: wrong about one
+word in seven, silent about two in three. The problem was that the disambiguator was MLE, which disambiguates each word in isolation and cannot see the verb
+in the sentence. This caused it to send back wrong diactritics and wrong case features, which the rules then misread.
+
+
+**Every one of MLE's errors was a case error, and every one disappeared under BERT.**
+
+    الرجل   MLE acc ✗ → BERT nom ✓   فاعل
+    اليوم   MLE acc ✗ → BERT nom ✓   اسم كان
+    كتاب    MLE gen ✗ → BERT nom ✓   مبتدأ
+    الطالب  MLE nom ✗ → BERT gen ✓   مضاف إليه
+    جديد    MLE gen ✗ → BERT nom ✓   خبر
+    الدرس   MLE gen ✗ → BERT acc ✓   مفعول به
+
+The reason is structural rather than a matter of model quality: **MLE disambiguates each word in
+isolation.** On يأكل الرجل السمك it picks الرجل's commonest reading with no idea a verb precedes
+it. BERT reads the sentence. Undiacritized الرجل is genuinely three words — الرجلُ، الرجلَ، الرجلِ —
+and nothing in the word itself can choose between them.
+
+`CamelMorphology` now takes a `kind`, defaults to `bert`, and honours `$SIBAWAYH_DISAMBIGUATOR`.
+`mle` stays reachable for environments where 445MB is too much, with a docstring saying plainly
+that its case output cannot be trusted on short input. Both classes share an interface, so
+`analyze` is unchanged and nothing downstream moved.
+
+
+### What this did not fix, and why it is not the disambiguator's fault
+
+The 4 remaining wrong answers are all one sentence — `verbal_passive_01`, where BERT reads كتبت as
+active كَتَبَت "she wrote the article" and inserts a covert هي. That is a real reading of
+undiacritized كتبت, already recorded as the one place the model and the guidelines disagree.
+
+Most of the 8 abstentions come from `mood`. **Both** disambiguators return `mod='u'` on imperfect
+verbs. يقرأُ /
+يقرأَ / يقرأْ are spelled identically, so neither model can tell, and both correctly decline.
+
+That is not a morphology problem at all. **The particle determines the mood**: لم *makes* the verb
+jussive, which is the عامل doing exactly what the tradition says it does. So this is the parser's job. Recovering it belongs in
+`particles.py` as syntax informing morphology.
+
+### Verb classification splits cleanly by tense
+
+Measured on the eval set through the real pipeline:
+
+| | correct | why |
+|---|---|---|
+| ماضٍ | **2 of 3** | fails only on كتبت, where the voice is genuinely ambiguous |
+| مضارع | **0 of 4** | every one has `mood=unknown`, so every rule declines |
+
+Not a rule bug. The three features a verb's name is built from behave very differently:
+
+* **aspect** — always reliable, because ماضٍ and مضارع differ in the word's *shape*
+* **voice** — usually reliable, fails on forms that really are ambiguous
+* **mood** — never available. And frankly, not needed here. It lives in a final short vowel (يقرأُ / يقرأَ / يقرأْ) that
+  undiacritized text does not carry, and all five candidate analyses come back `mod:u`. There is
+  nothing to rank, so no disambiguator can help.
+
+CAMeL's behaviour here is exactly backwards from useful, and both disambiguators do it: on a
+**ماضٍ**, where mood is grammatically inapplicable, it confidently returns `mod:i`; on a
+**مضارع**, where mood is the whole question, it returns `mod:u`. Arguably `na` would be right on
+the perfect — that is the "not applicable" value the schema has — and returning `indicative`
+instead is what made the priority-tie bug below possible.
+
+Three of the four failing verbs are recoverable without any model: لم and لن *assign* the mood,
+and an ungoverned مضارع is مرفوع by default. That would take المضارع from 0 of 4 to 3 of 4. If
+nothing is governing it, it is indicative.
+
+### Two rule fixes that came out of running on real data
+
+
+**إنّ comes back as `conj`.** BERT tags it `conj_sub`, which the collapse table maps to `conj`,
+where `nawasikh.py` and `particles.py` both expected `part`. The reading is defensible — أنّ really
+does subordinate — so both files now accept either, and the lemma does the actual identifying.
+Without this the whole of `nasikh_inna_01` abstained.
 
 ---
 

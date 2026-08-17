@@ -48,8 +48,13 @@ def _governing_particle(vocabulary: frozenset[str], mood: Mood, family: str):
 
 
 def _inna_particle(token: Token, head: Token | None, tokens: Sequence[Token]) -> Evidence | None:
-    """إنّ and its sisters: accusative on the اسم rather than mood on a verb."""
-    if token.pos is not Pos.PART or not lemma_in(token, INNA_AND_SISTERS):
+    """إنّ and its sisters: accusative on the اسم rather than mood on a verb.
+
+    `conj` is accepted alongside `part` for the reason given in `nawasikh.py`:
+    the BERT disambiguator reads إنّ as `conj_sub`, and the lemma is what
+    actually identifies the family.
+    """
+    if token.pos not in {Pos.PART, Pos.CONJ} or not lemma_in(token, INNA_AND_SISTERS):
         return None
     if head is not None:
         return None

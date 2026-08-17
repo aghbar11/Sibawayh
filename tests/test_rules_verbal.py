@@ -132,6 +132,16 @@ def test_a_verb_serving_as_khabar_is_left_to_nominal_py() -> None:
     assert VERB_IMPERFECT_INDICATIVE(the_verb, result[0], result) is None
 
 
+def test_a_perfect_verb_is_never_called_imperfect() -> None:
+    """Regression. CAMeL fills `mood` on perfect verbs too — كتب comes back
+    aspect=perfect *and* mood=indicative — so a rule keyed on mood alone claimed
+    it as فعل مضارع مرفوع. Gold could not catch this: it sets one or the other,
+    never both."""
+    both = verb("كتب", aspect="perfect", mood="indicative", voice="active")
+    assert VERB_IMPERFECT_INDICATIVE(both, None, [both]) is None
+    assert apply_rules([both])[0].irab_role == "فعل ماضٍ"
+
+
 def test_a_passive_imperfect_abstains() -> None:
     """No gold example, so no rule. Inventing the string would be a guess."""
     passive = verb("يُكتب", mood="indicative", voice="passive")
