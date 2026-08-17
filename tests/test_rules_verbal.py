@@ -142,6 +142,58 @@ def test_a_perfect_verb_is_never_called_imperfect() -> None:
     assert apply_rules([both])[0].irab_role == "فعل ماضٍ"
 
 
+def test_mood_is_taken_from_the_particle_when_morphology_cannot_supply_it() -> None:
+    """The عامل assigns the mood, and on real input it is the only thing that can.
+
+    Undiacritized يقرأ carries no mood — every analysis comes back `mod:u` — so
+    a rule demanding `mood is JUSSIVE` never fires on what students actually
+    type. لم *makes* the verb مجزوم, which is what the tradition says, and the
+    tree already records that لم governs it.
+    """
+    particle = Token(id=1, form="لم", pos=Pos.PART, head=0)
+    unreadable = Token(
+        id=2, form="يقرأ", pos=Pos.VERB, head=1, feats=Features(aspect="imperfect", mood="unknown")
+    )
+    result = apply_rules([particle, unreadable])
+    assert result[1].irab_role == "فعل مضارع مجزوم"
+    assert result[1].rule_id == "VERB_IMPERFECT_JUSSIVE"
+    # the evidence must say the mood was imposed, not read
+    assert "mood=jussive_from_governor" in result[1].evidence
+    assert "governed_by=jussive_particle" in result[1].evidence
+
+
+def test_an_ungoverned_imperfect_defaults_to_indicative() -> None:
+    """مرفوع is the absence of a عامل, so it has to be earned by finding none."""
+    verb = Token(
+        id=1, form="يأكل", pos=Pos.VERB, head=0, feats=Features(aspect="imperfect", mood="unknown")
+    )
+    assert apply_rules([verb])[0].irab_role == "فعل مضارع مرفوع"
+
+
+def test_a_reported_mood_is_never_overridden_by_the_tree() -> None:
+    """Syntax fills a gap; it does not outrank morphology that spoke."""
+    particle = Token(id=1, form="لم", pos=Pos.PART, head=0)
+    indicative = Token(
+        id=2,
+        form="يقرأ",
+        pos=Pos.VERB,
+        head=1,
+        feats=Features(aspect="imperfect", mood="indicative"),
+    )
+    assert VERB_IMPERFECT_JUSSIVE(indicative, particle, [particle, indicative]) is None
+
+
+def test_the_particle_is_found_even_if_the_parser_misattached_it() -> None:
+    """Checked by adjacency as well as by attachment. Relying on the arc alone
+    would turn a parser slip into a confident مرفوع."""
+    particle = Token(id=1, form="لن", pos=Pos.PART, head=0)
+    verb = Token(
+        id=2, form="يكتب", pos=Pos.VERB, head=0, feats=Features(aspect="imperfect", mood="unknown")
+    )
+    result = apply_rules([particle, verb])
+    assert result[1].irab_role == "فعل مضارع منصوب"
+
+
 def test_a_passive_imperfect_abstains() -> None:
     """No gold example, so no rule. Inventing the string would be a guess."""
     passive = verb("يُكتب", mood="indicative", voice="passive")

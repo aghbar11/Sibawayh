@@ -37,12 +37,30 @@ from sibawayh.schema import ROOT_HEAD, Case, Pos, State, Token
 NOMINAL = frozenset({Pos.NOUN, Pos.PROPN, Pos.PRON, Pos.ADJ})
 
 
+TOPIC_CASES = frozenset({Case.NOM, Case.UNKNOWN, None})
+"""What a مبتدأ's case may be.
+
+`nom` is what it *should* be. `unknown` and unset are allowed because position
+stands in: under Sibawayh convention the مبتدأ **is** the first token, which is
+precisely what `arcs.py` re-roots the tree to guarantee, so a root nominal is
+the مبتدأ whether or not the analyser could read its ending. Bare proper nouns
+make this necessary rather than merely convenient — محمدٌ / محمدًا / محمدٍ are
+spelled identically, so محمد comes back `unknown` and took its whole clause down
+with it.
+
+`acc` and `gen` are still refused, and that is the point of listing cases rather
+than dropping the check. A definite accusative at the front is a fronted
+مفعول به — الكتابَ قرأ محمد — not a مبتدأ. Morphology that actually spoke is
+never contradicted; only silence is filled in.
+"""
+
+
 def _is_topic(token: Token) -> bool:
-    """A nominative nominal at the root — the المبتدأ, by our convention."""
+    """A nominal at the root — the المبتدأ, by our convention."""
     return (
         token.head == ROOT_HEAD
         and token.pos in NOMINAL
-        and token.feats.case is Case.NOM
+        and token.feats.case in TOPIC_CASES
         and not token.inserted
     )
 
@@ -55,7 +73,12 @@ def _topic(*, construct: bool):
             return None
         if (token.feats.state is State.CONSTRUCT) is not construct:
             return None
-        evidence = ["sentence_initial", "is_root", f"pos={token.pos}", "case=nom"]
+        evidence = ["sentence_initial", "is_root", f"pos={token.pos}"]
+        # Say whether the case was read or assumed from position, the same way
+        # the verb rules distinguish a reported mood from an imposed one.
+        evidence.append(
+            "case=nom" if token.feats.case is Case.NOM else "case_unreadable_position_decides"
+        )
         if construct:
             evidence.append("state=construct")
         return evidence

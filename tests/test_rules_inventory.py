@@ -156,6 +156,25 @@ def test_all_three_predicate_shapes(sentence_id: str, form: str, role: str, rule
     assert role_of(sentence_id, form) == (role, rule_id)
 
 
+def test_an_unreadable_case_at_the_root_is_still_the_topic() -> None:
+    """Position stands in for case. محمد is spelled the same in all three cases,
+    so the analyser returns `unknown` — and without this it took its whole clause
+    down with it, since the خبر rules ask whether their head is the مبتدأ."""
+    topic = Token(id=1, form="محمد", pos=Pos.PROPN, head=0, feats=Features(case="unknown"))
+    verb = Token(id=2, form="يقرأ", pos=Pos.VERB, head=1, feats=Features(aspect="imperfect"))
+    result = apply_rules([topic, verb])
+    assert result[0].irab_role == "مبتدأ"
+    assert "case_unreadable_position_decides" in result[0].evidence
+    assert result[1].irab_role == "خبر — جملة فعلية"
+
+
+def test_a_definite_accusative_at_the_root_is_not_the_topic() -> None:
+    """الكتابَ قرأ محمد fronts the object. Morphology that actually spoke is never
+    contradicted — only silence is filled in."""
+    fronted = Token(id=1, form="الكتاب", pos=Pos.NOUN, head=0, feats=Features(case="acc"))
+    assert TOPIC(fronted, None, [fronted]) is None
+
+
 def test_an_inserted_pronoun_is_never_the_topic() -> None:
     """A covert agent sits under a verb, but nothing may promote it to مبتدأ."""
     pronoun = Token(

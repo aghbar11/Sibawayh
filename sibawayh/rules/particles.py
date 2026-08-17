@@ -26,11 +26,19 @@ from sibawayh.rules.lexicon import (
     SUBJUNCTIVE_PARTICLES,
     lemma_in,
 )
-from sibawayh.schema import Mood, Pos, Token
+from sibawayh.schema import Aspect, Mood, Pos, Token
 
 
 def _governing_particle(vocabulary: frozenset[str], mood: Mood, family: str):
-    """Build the predicate for a particle that governs a verb's mood."""
+    """Build the predicate for a particle that governs a verb's mood.
+
+    The verb's *reported* mood is not required to match. Undiacritized يقرأ
+    carries no mood — every analysis comes back `mod:u` — so demanding
+    `mood is JUSSIVE` would mean لم is never recognised on exactly the input
+    students type. What identifies the particle is its lemma and the fact that
+    it governs an imperfect verb; the mood is what it *imposes*, not evidence
+    for what it is.
+    """
 
     def when(token: Token, head: Token | None, tokens: Sequence[Token]) -> Evidence | None:
         if token.pos is not Pos.PART or not lemma_in(token, vocabulary):
@@ -38,11 +46,17 @@ def _governing_particle(vocabulary: frozenset[str], mood: Mood, family: str):
         governed = [
             other
             for other in tokens
-            if other.head == token.id and other.pos is Pos.VERB and other.feats.mood is mood
+            if other.head == token.id
+            and other.pos is Pos.VERB
+            # Not `is IMPERFECT`: gold sets aspect *or* mood on a verb, never
+            # both, so an unset aspect has to be acceptable. Only an explicitly
+            # perfect verb is disqualified — a جازم never governs one.
+            and other.feats.aspect is not Aspect.PERFECT
+            and other.feats.mood in {mood, Mood.UNKNOWN, None}
         ]
         if not governed:
             return None
-        return [f"lemma_in_{family}", "heads_a_verb", f"governs_mood={mood}"]
+        return [f"lemma_in_{family}", "heads_an_imperfect_verb", f"governs_mood={mood}"]
 
     return when
 

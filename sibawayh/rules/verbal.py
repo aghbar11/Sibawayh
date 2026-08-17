@@ -28,7 +28,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from sibawayh.rules.base import Evidence, Rule
-from sibawayh.rules.lexicon import is_defective_verb
+from sibawayh.rules.lexicon import (
+    JUSSIVE_PARTICLES,
+    SUBJUNCTIVE_PARTICLES,
+    is_defective_verb,
+    lemma_in,
+)
 from sibawayh.schema import Aspect, Case, Mood, Pos, Token, Voice
 
 NOMINAL = frozenset({Pos.NOUN, Pos.PROPN, Pos.PRON, Pos.ADJ})
@@ -57,6 +62,37 @@ def _governs_a_predicate(verb: Token, tokens: Sequence[Token]) -> bool:
     return any(token.head == verb.id and token.parser_label == PRD for token in tokens)
 
 
+MOOD_GOVERNORS: dict[Mood, str | None] = {
+    Mood.JUSSIVE: "jussive",
+    Mood.SUBJUNCTIVE: "subjunctive",
+    Mood.INDICATIVE: None,
+}
+"""Which kind of عامل assigns each mood. `None` for المرفوع — a مضارع is
+indicative precisely when *nothing* governs it, which is why the default has to
+be earned by finding no ناصب and no جازم rather than assumed."""
+
+
+def _mood_governor(token: Token, head: Token | None, tokens: Sequence[Token]) -> str | None:
+    """Which kind of particle governs `token`'s mood, or `None` if none does.
+
+    Checked two ways, because relying on attachment alone is fragile: the
+    particle may be the verb's head, or may simply be the token immediately
+    before it. Under Sibawayh convention the جازم heads the verb, but a parser
+    that misattaches would otherwise silently produce مرفوع — the wrong answer
+    delivered confidently.
+    """
+    candidates = [other for other in tokens if head is not None and other.id == head.id]
+    candidates += [other for other in tokens if other.id == token.id - 1]
+    for candidate in candidates:
+        if candidate.pos not in {Pos.PART, Pos.CONJ}:
+            continue
+        if lemma_in(candidate, JUSSIVE_PARTICLES):
+            return "jussive"
+        if lemma_in(candidate, SUBJUNCTIVE_PARTICLES):
+            return "subjunctive"
+    return None
+
+
 def _verb_form(aspect: Aspect | None, mood: Mood | None, voice: Voice | None):
     """Build the predicate for one verb form, guarding the exclusions above."""
 
@@ -72,8 +108,18 @@ def _verb_form(aspect: Aspect | None, mood: Mood | None, voice: Voice | None):
             return None
         if aspect is Aspect.IMPERFECT and token.feats.aspect is Aspect.PERFECT:
             return None
+        governor = None
         if mood is not None and token.feats.mood is not mood:
-            return None
+            # Morphology usually cannot supply a مضارع's mood: يقرأُ / يقرأَ /
+            # يقرأْ are spelled identically, and every analysis comes back
+            # `mod:u`. The عامل is what assigns it — لم makes the verb مجزوم —
+            # so an unreadable mood is resolved from the tree instead. A mood
+            # the analyzer *did* report is never overridden.
+            if token.feats.mood not in {Mood.UNKNOWN, None}:
+                return None
+            governor = _mood_governor(token, head, tokens)
+            if governor is not MOOD_GOVERNORS.get(mood):
+                return None
         # An unstated voice means active; an explicitly passive verb needs its
         # own rule, and there is none for the imperfect.
         actual = token.feats.voice
@@ -86,7 +132,17 @@ def _verb_form(aspect: Aspect | None, mood: Mood | None, voice: Voice | None):
         if aspect is not None:
             evidence.append(f"aspect={aspect}")
         if mood is not None:
-            evidence.append(f"mood={mood}")
+            # Say *how* the mood was settled. "The analyzer read it" and "the
+            # عامل imposes it" are different claims, and the hint text for the
+            # second one names the particle — which is the lesson.
+            if token.feats.mood is mood:
+                evidence.append(f"mood={mood}")
+            elif governor is None:
+                evidence.append(f"mood={mood}_by_default")
+                evidence.append("no_governing_particle")
+            else:
+                evidence.append(f"mood={mood}_from_governor")
+                evidence.append(f"governed_by={governor}_particle")
         if voice is Voice.PASSIVE:
             evidence.append("voice=passive")
         return evidence

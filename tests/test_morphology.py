@@ -281,10 +281,15 @@ def test_al_is_a_feature_not_a_token() -> None:
 
 
 def test_idafa_carries_construct_state() -> None:
-    """`stt=c` is the إضافة signal; idafa_01 is the test that it reaches us."""
+    """`stt=c` is the إضافة signal; idafa_01 is the test that it reaches us.
+
+    The case assertion changed when the disambiguator did. MLE read كتاب as
+    genitive, which is wrong — it is the مبتدأ of كتاب الطالب جديد and gold says
+    nominative. This test used to assert the error. BERT gets it right.
+    """
     sentence = build("idafa_01")
     assert sentence.tokens[0].feats.state == State.CONSTRUCT
-    assert sentence.tokens[0].feats.case == Case.GEN
+    assert sentence.tokens[0].feats.case == Case.NOM
 
 
 def test_attached_preposition_becomes_its_own_token() -> None:
@@ -418,11 +423,20 @@ def test_alternatives_expose_a_thin_win() -> None:
 
 
 def test_top_analysis_can_be_wrong() -> None:
-    """إن comes back as `pos=abbrev` ahead of the إِنَّ reading. Recorded as a fact
-    about the analyzer, not a wish: the rule layer must not trust rank 1 blindly."""
-    inna = build("nasikh_inna_01").tokens[0]
-    assert inna.pos_fine == "abbrev"
-    assert any(a.pos_fine == "verb_pseudo" for a in inna.alternatives)
+    """Rank 1 is still not to be trusted blindly, but the example had to change.
+
+    MLE read إن as `pos=abbrev`, ahead of the إِنَّ reading — the original case
+    for this test. BERT reads it as `conj_sub`, which is defensible, so that
+    example no longer demonstrates anything.
+
+    كتبت still does. Gold calls it passive; the analyzer prefers active كَتَبَت
+    and keeps the passive only as a runner-up. The principle the rule layer
+    depends on is unchanged: the right answer can sit below rank 1, which is why
+    `alternatives` and the score margin exist.
+    """
+    verb = build("verbal_passive_01").tokens[0]
+    assert verb.feats.voice == Voice.ACTIVE
+    assert any(a.feats.voice == Voice.PASSIVE for a in verb.alternatives)
 
 
 # --- the live path, off by default ------------------------------------------------

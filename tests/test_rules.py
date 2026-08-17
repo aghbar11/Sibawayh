@@ -151,9 +151,16 @@ def test_stage_abstains_rather_than_guessing() -> None:
         Token(id=2, form="مشرقة", pos=Pos.ADJ, head=1),
     ]
     result = apply_rules(tokens)
-    assert all(token.irab_role is None for token in result)
-    assert all(token.rule_id is None for token in result)
-    assert all("irab_role" not in token.provenance for token in result)
+
+    # The root resolves on position alone — that is deliberate, see TOPIC_CASES.
+    assert result[0].irab_role == "مبتدأ"
+
+    # The adjective does not, and must not. صفة and خبر are separated by
+    # definiteness agreement and nothing else, so with no state on either token
+    # there is no answer to give.
+    assert result[1].irab_role is None
+    assert result[1].rule_id is None
+    assert "irab_role" not in result[1].provenance
 
 
 def test_stage_does_not_mutate_its_input() -> None:

@@ -58,6 +58,9 @@ Newest last.
 | 5 | default disambiguator is BERT, not MLE — MLE's case output is unusable on short input |
 | 12 | perfect verbs were being named مضارع; the imperfect rules now assert aspect too |
 | 5 | مضارع is never classified — `mood` is unavailable from morphology, fix is syntactic |
+| 12 | verb rules take the mood from the governing particle when morphology cannot supply it |
+| 12 | a root nominal is the مبتدأ even with an unreadable case; `acc`/`gen` still refused |
+| 5 | `camel_analyses.json` re-recorded against BERT; two tests had asserted MLE's errors |
 | 12 | `nawasikh.py` and `particles.py` accept `conj` as well as `part` for إنّ |
 | 2 | `gen: b` / `num: b` are declared by CAMeL but never observed — correction |
 | — | `docs/REFERENCE.md` added — every field and value, generated from `schema.py` |
@@ -799,6 +802,83 @@ instead is what made the priority-tie bug below possible.
 Three of the four failing verbs are recoverable without any model: لم and لن *assign* the mood,
 and an ungoverned مضارع is مرفوع by default. That would take المضارع from 0 of 4 to 3 of 4. If
 nothing is governing it, it is indicative.
+
+### Built: the mood comes from the عامل
+
+المضارع went **0 of 4 → 3 of 4**, and overall on real morphology **29 → 34 correct, 8 → 3
+abstained**.
+
+Done without a new stage and without writing morphology back onto tokens. The verb rules accept a
+governing particle as an *alternative* to a reported mood; nothing mutates `feats`.
+
+* A reported mood is **never overridden**. Syntax fills a gap; it does not outrank morphology that
+  spoke.
+* `MOOD_GOVERNORS` maps each mood to the kind of عامل that assigns it, with `None` for المرفوع —
+  indicative is precisely the *absence* of a ناصب or جازم, so the default is earned by finding
+  none rather than assumed.
+* The governor is looked for **both** as the verb's head and as the token immediately before it.
+  Under Sibawayh convention the جازم heads the verb, but relying on the arc alone would turn a
+  parser slip into a confident مرفوع.
+
+`particles.py` needed the mirror change: `JUSSIVE_PARTICLE` required its verb to *report* the
+jussive, which never happens on undiacritized input, so لم went unrecognised on exactly the
+sentences students type.
+
+**Evidence records how the mood was settled** — `mood=jussive` when the analyzer read it, versus
+`mood=jussive_from_governor` plus `governed_by=jussive_particle` when the tree supplied it. Those
+are different claims, and the hint text for the second one names the particle, which is the lesson.
+
+Two problems faced:
+
+**Requiring `aspect is IMPERFECT` broke it on gold.** Gold sets aspect *or* mood, never both, so
+an unset aspect has to be acceptable and only an explicitly perfect verb is disqualified. The same
+shape as the priority-tie bug — gold-shaped inputs are not analyser-shaped ones.
+
+**"No head" is not the test for indicative.** A مضارع can have a head and still be مرفوع: in
+محمد يقرأ الكتاب it hangs off the مبتدأ. And `prc1` carries `li_jus`/`li_sub`, so a مضارع can be
+governed by an *attached* لام with no separate particle token at all. That case is untested — no
+tier-1 sentence has one.
+
+The fourth verb, in `nominal_verbal_predicate_01`, was never a mood problem: it is a خبر and fails
+for a separate reason, still undiagnosed.
+
+### Position stands in for an unreadable case at the root
+
+**37 correct, 3 wrong, 1 abstained** of 41 on real morphology, from 34/4/3.
+
+`TOPIC` required `case is NOM`. Bare proper nouns break that: محمدٌ / محمدًا / محمدٍ are spelled
+identically, so محمد comes back `unknown` — and it took its whole clause with it, because the خبر
+rules ask whether their head is the مبتدأ. Two tokens silenced by one unreadable ending.
+
+Under Sibawayh convention the مبتدأ **is** the first token; that is exactly what `arcs.py`
+re-roots the tree to guarantee. So position is not a heuristic here, it is the convention, and a
+root nominal is the مبتدأ whether or not the analyser could read its ending.
+
+`TOPIC_CASES` allows `nom`, `unknown` and unset — and **refuses `acc` and `gen`**. That refusal is
+the point of listing cases rather than deleting the check: الكتابَ قرأ محمد fronts an object, and
+that accusative first word is a مفعول به. Same principle as the mood work above — fill silence,
+never contradict morphology that spoke.
+
+Evidence distinguishes the two: `case=nom` when read, `case_unreadable_position_decides` when
+inferred, so a hint can say *this starts the sentence* rather than implying an ending we never saw.
+
+**Still open.** `VERBAL_AGENT` has the identical problem and has not had the identical fix — محمد
+in `jussive_lam_01` is the last abstention for exactly this reason. Left alone deliberately: a
+فاعل is not positionally determined the way a مبتدأ is, so the same argument does not transfer and
+would need its own.
+
+### The fixture was re-recorded against BERT
+
+`tests/data/camel_analyses.json` held MLE output, so the offline tests described a configuration
+we no longer ship. Re-recorded; `pytest -m camel` is green again.
+
+Two tests changed with it, and both had been **asserting MLE's mistakes**:
+
+* `test_idafa_carries_construct_state` expected `case=gen` on كتاب in كتاب الطالب جديد. It is the
+  مبتدأ and gold says nominative. BERT returns nominative; the test now asserts that.
+* `test_top_analysis_can_be_wrong` used إن coming back `pos=abbrev`. BERT reads it `conj_sub`, so
+  that example is gone. The principle still holds and the test now uses كتبت, where the passive
+  reading gold wants really does sit below rank 1.
 
 ### Two rule fixes that came out of running on real data
 
