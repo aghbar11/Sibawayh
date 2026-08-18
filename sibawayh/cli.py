@@ -25,6 +25,7 @@ from collections.abc import Sequence
 from sibawayh import __version__
 from sibawayh.arcs import normalize_arcs
 from sibawayh.covert import insert_covert_pronouns
+from sibawayh.hints import ladder
 from sibawayh.renderers import Renderer, describe
 from sibawayh.renderers.template import TemplateRenderer
 from sibawayh.rules import apply_rules
@@ -136,6 +137,28 @@ def format_irab(sentence: Sentence, renderer: Renderer | None = None) -> str:
     )
 
 
+def format_hints(sentence: Sentence, revealed: int) -> str:
+    """The hint ladder for every token, revealed as far as `revealed`.
+
+    The third rung is the answer, so a caller asking for one or two is asking to
+    be taught rather than told. Words the rules declined have no ladder and say
+    so, which is the same thing the answer view says about them.
+    """
+    blocks = []
+    for token in sentence.tokens:
+        rungs = ladder(token)
+        word = token.diac or token.form
+        if rungs is None:
+            blocks.append(f"{word}\n    {UNCERTAIN}")
+            continue
+        steps = "\n".join(
+            f"    {number}. {rung.text}"
+            for number, rung in enumerate(rungs.upto(revealed), start=1)
+        )
+        blocks.append(f"{word}\n{steps}" if steps else word)
+    return "\n\n".join(blocks)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="sibawayh",
@@ -182,6 +205,15 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="rephrase each line as teaching prose with Gemini (needs $GEMINI_API_KEY)",
     )
+    irab.add_argument(
+        "--hints",
+        type=int,
+        nargs="?",
+        const=1,
+        default=0,
+        metavar="N",
+        help="show the first N hints for each word instead of the answer (1-3)",
+    )
     irab.add_argument("--json", action="store_true", help="print the Sentence as JSON")
     return parser
 
@@ -224,6 +256,8 @@ def _irab(args: argparse.Namespace) -> int:
 
     if args.json:
         print(analyzed.model_dump_json(indent=2))
+    elif args.hints:
+        print(format_hints(analyzed, args.hints))
     else:
         renderer: Renderer = TemplateRenderer()
         if args.llm:

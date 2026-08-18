@@ -7,10 +7,25 @@ any of them failed to survive the rewrite, the reply is discarded.
 * **the role** — مبتدأ has to still be مبتدأ
 * **the case** — منصوب has to still be منصوب
 * **the sign** — الياء has to still be الياء
+* **the reason** — if the reply explains itself, the explanation has to be one
+  the rule actually gave
 
-Nothing else is checked. Word order, extra explanation, a friendlier register, a
-sentence about why إنّ does what it does — all of that is the point of asking a
-model at all. What may not change is any fact the layers below decided.
+Word order, register, phrasing, warmth — all of that is the point of asking a
+model at all, and none of it is checked. What may not change is any fact the
+layers below decided.
+
+**The fourth is the one that took an argument to get right.** A reply can keep
+the role, the case and the sign perfectly and still teach something false:
+*نعت مرفوع وعلامة رفعه الضمة، لأنه جمع مذكر سالم* passes the first three and its
+reason is nonsense. And the reason is the part that teaches — a student who
+memorizes a wrong justification has learned something worse than nothing.
+
+`Token.evidence` is what the rule actually observed, and `reasons.py` turns those
+keys into Arabic. Each carries an anchor word, and a reply that explains itself
+has to contain at least one of them. That is a test for *groundedness*, not for
+correctness: it says the explanation came from the evidence rather than from the
+model's memory. A reply that keeps the facts and offers no reason at all is
+refused too, since the template line says exactly as much and is not a guess.
 
 **Comparison ignores diacritics.** A model writing منصوبٌ has not disagreed with
 منصوب, and rejecting it would discard a correct reply over a tanween. The words
@@ -40,6 +55,7 @@ from dataclasses import dataclass
 from sibawayh.diacritics import split_marks
 from sibawayh.renderers.inflection import inflection_for
 from sibawayh.renderers.phrases import phrase_for
+from sibawayh.renderers.reasons import reasons_in
 from sibawayh.renderers.signs import sign_for
 from sibawayh.schema import Token
 
@@ -102,6 +118,24 @@ def missing_from(reply: str, facts: Facts) -> tuple[str, ...]:
     return tuple(fact for fact in facts.stated if not appears_in(reply, fact))
 
 
+def anchors_of(token: Token) -> tuple[str, ...]:
+    """The words that would show an explanation came from this token's evidence."""
+    return tuple(reason.anchor for reason in reasons_in(token.evidence))
+
+
+def is_grounded(reply: str, token: Token) -> bool:
+    """Whether the reply's explanation, if any, came from the rule's own evidence.
+
+    True when the token records no reason at all: there is nothing to be grounded
+    in, and demanding one would refuse every reply for a token the rules said
+    little about.
+    """
+    anchors = anchors_of(token)
+    if not anchors:
+        return True
+    return any(appears_in(reply, anchor) for anchor in anchors)
+
+
 def is_faithful(reply: str, token: Token) -> bool:
     """Whether `reply` may be shown to a student in place of the template line."""
-    return not missing_from(reply, facts_of(token))
+    return not missing_from(reply, facts_of(token)) and is_grounded(reply, token)

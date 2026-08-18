@@ -254,3 +254,35 @@ def test_the_irab_subcommand_exists() -> None:
     args = build_parser().parse_args(["irab", "الكتاب مفيد"])
     assert args.command == "irab"
     assert args.text == "الكتاب مفيد"
+
+
+def test_format_hints_stops_before_the_answer() -> None:
+    """Asking for one or two rungs is asking to be taught rather than told."""
+    from sibawayh.cli import format_hints
+
+    sentence = Sentence(
+        sentence="الكتاب مفيد",
+        tokens=[
+            Token(
+                id=1,
+                form="الكتاب",
+                diac="الكِتابُ",
+                pos=Pos.NOUN,
+                irab_role="مبتدأ",
+                evidence=["sentence_initial"],
+                feats=Features(case=Case.NOM, num=Number.S, gen=Gender.M),
+            )
+        ],
+    )
+    shown = format_hints(sentence, 1)
+    assert "بأي كلمة بدأت الجملة؟" in shown
+    assert "مرفوع" not in shown
+
+    assert "مرفوع" in format_hints(sentence, 3)
+
+
+def test_format_hints_says_when_there_is_nothing_to_teach() -> None:
+    from sibawayh.cli import UNCERTAIN, format_hints
+
+    sentence = Sentence(sentence="مفيد", tokens=[Token(id=1, form="مفيد", pos=Pos.ADJ)])
+    assert UNCERTAIN in format_hints(sentence, 2)

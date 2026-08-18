@@ -14,9 +14,16 @@ already assembled, and including it turns the task from *analyze this word* into
 *rewrite this sentence for a student*. The second task is one a model is reliably
 good at; the first is the one it invents answers to.
 
-**Nothing here is prose.** The payload is data, so the same structure can be
-checked against the reply afterwards — the role that went in has to be the role
-that comes out.
+**The reasons travel in Arabic.** `evidence` is a list of internal keys, and a
+model handed `head_lemma_in_inna_sisters` would have to guess what it meant. So
+`reasons.py` turns each key into a sentence, and those sentences are what the
+model is told to explain from. The check afterwards looks for the same content,
+which only works if the model was shown it in the first place.
+
+**Nothing here is invented.** Every field was computed by a layer that can be
+checked, so the same structure can be compared against the reply — the role that
+went in has to be the role that comes out, and the reason has to be one that went
+in at all.
 """
 
 from __future__ import annotations
@@ -25,6 +32,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from sibawayh.covert import INSERTED_MARK
+from sibawayh.renderers.reasons import reasons_in
 from sibawayh.renderers.template import line_for
 from sibawayh.schema import Token
 
@@ -72,6 +80,13 @@ def token_payload(token: Token, tokens: Sequence[Token]) -> dict[str, Any]:
         payload["role"] = token.irab_role
     if token.evidence:
         payload["evidence"] = list(token.evidence)
+    reasons = reasons_in(token.evidence)
+    if reasons:
+        # The reasons travel in Arabic, not as keys. The model is asked to
+        # explain from these and from nothing else, and `faithful.py` checks
+        # afterwards that it did — so sending the keys alone would be asking it
+        # to invent the wording of something it will then be graded on.
+        payload["reasons"] = [reason.because for reason in reasons]
     if token.inserted:
         payload["covert"] = True
 

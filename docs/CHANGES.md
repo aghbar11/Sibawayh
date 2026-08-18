@@ -92,6 +92,11 @@ Newest last.
 | 15 | no SDK; one POST over `urllib`, transport injected so the tests never spend quota |
 | 15 | the default is three lite models swept in order, not `gemini-flash-latest` |
 | — | `Sign` carries `mark` as its own field, for the check to compare against |
+| 16 | `reasons.py` — every evidence key gets a question, a reason and an anchor word |
+| 16 | `hints.py` — three rungs, built from evidence, needing no model |
+| 15 | a fourth check: the model's reason must come from the rule's own evidence |
+| 16 | feature restatements get no entry; a hint made of `case=nom` gives the answer away |
+| 16 | `python -m sibawayh irab --hints N` shows the first N rungs instead of the answer |
 
 **Why the inventory is 25 and not 34.** The plan says every label must be in the 34-label set of
 the I3rab paper. Nine of those have no rule producing them — حال، تمييز، بدل، توكيد، عطف، مفعول
@@ -305,6 +310,49 @@ that line is the only thing standing between a key and a public commit.
 **No SDK.** One POST to one endpoint over `urllib`, so no dependency and no licence question is
 added to a project that tracks both carefully. The transport is injected, which is why every test
 runs offline and none of them spend quota.
+
+**The evidence list finally does the job it was added for.** `Token.evidence` has recorded why
+every analysis came out the way it did since the rule engine was built, and nothing read it. Two
+things now do, and they share one table in `reasons.py`: each key gets a question, the reason stated
+plainly, and an anchor word.
+
+**The hint ladder is the first.** Three rungs — a question, then the reasoning, then the إعراب:
+
+    الطالِبِ   1. ما علاقة هذه الكلمة بالتي قبلها؟
+               2. لأنها جاءت بعد مضاف، فهي مضاف إليه
+               3. مضاف إليه مجرور وعلامة جره الكسرة الظاهرة على آخره
+
+Always three, never a variable number: a student has to be able to tell how close they are to the
+answer, and an interface where *one more hint* sometimes means the answer is one they stop
+trusting. No model is involved — the ladder is offline, free and identical every run — and a word
+the rules abstained on has no ladder at all, because a hint towards an analysis we do not have is a
+guess dressed as teaching.
+
+**A fourth check on the model's prose is the second.** Keeping the role, the case and the sign was
+not enough. A reply can keep all three and still teach something false — *نعت مرفوع وعلامة رفعه
+الضمة، لأنه جمع مذكر سالم* passes the first three — and the reason is the part that teaches. So the
+reasons now travel to the model in Arabic rather than as keys, the instruction says to explain from
+those and from nothing else, and a reply containing none of their anchors is refused. So is one
+that gives no reason at all: the template line says exactly as much and is not a guess.
+
+Measured live afterwards, every explanation traced to a key. المقالة came back as *نائب فاعل مرفوع
+… لأنها جاءت بعد فعل ولأن الفعل مبني للمجهول، فالمرفوع بعده نائب فاعل لا فاعل* — which is
+`head_pos=verb` and `head_voice=passive` reworded, not recalled.
+
+**Restatement keys are deliberately absent from the table.** `case=nom` repeats the مرفوع the line
+already states, so a hint built from one would give the answer away while pretending not to. Of the
+39 keys the eval set produces, exactly 8 are restatements and have no entry; all 40 tokens still
+have at least one reason, so no ladder has an empty middle rung.
+
+**A test caught our own wording failing our own check.** The anchor for `head_voice=passive` was
+written المجهول, which is not a substring of للمجهول — the two spell the ل differently — so the
+reason we supply would have been rejected by the check we apply. Anchors are bare stems now.
+
+**Still open, and agreed as the next piece.** The ladder's wording is the table's, so hints are
+correct and a little stiff, and `--hints` ignores `--llm` entirely. The model should phrase the
+rungs, but the ladder must keep deciding *what* each rung may contain — a model asked to hint at
+اسم إنّ will give the answer on the first rung, because being helpful is its default. That needs the
+inverse of the check above: rungs one and two must **not** contain the role or the case.
 
 Two edits were made directly to `CLAUDE.md`, both requested: the `prc0` bullet now records that
 `d3tok` splits ال and that folding it back is the rule, and the conventions section now
