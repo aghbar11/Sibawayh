@@ -133,6 +133,12 @@ button[disabled]{opacity:.55;cursor:progress}
 .arclabel{font-family:var(--serif);font-size:14px;fill:var(--ink-soft);text-anchor:middle}
 .arclabel.lit{fill:var(--rubric);font-weight:700}
 .stem{stroke:var(--gold);stroke-width:2}
+.treeword{
+  font-family:var(--serif);font-size:26px;fill:var(--ink);text-anchor:middle;
+}
+.treeword.lit{fill:var(--rubric);font-weight:700}
+.treeword.covert{fill:var(--moss);font-style:italic}
+.treeword.unsure{fill:var(--sage)}
 
 /* ---------- the words ---------- */
 .line{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:4px}
@@ -499,9 +505,14 @@ function guess(text) {
 
 /* ---------- the arc diagram ---------- */
 
-const ARC_HEIGHT = 26;   // per unit of distance between two words
-const MAX_ARC = 132;
-const TOP = 12;
+const ARC_HEIGHT = 26;   // the shortest arc, before distance and depth are added
+const MAX_ARC = 150;
+const TOP = 14;          // clear space above the tallest arc
+const LABEL = 10;        // room for a role written just under an apex
+const GAP = 30;          // between two words in the diagram
+const MARGIN = 24;
+const WORD_DROP = 44;    // from where the arcs land to the baseline of the words
+const WORD_FONT = '26px Amiri, "Traditional Arabic", serif';
 
 function drawTree() {
   const diagram = el("diagram");
@@ -523,19 +534,27 @@ function drawTree() {
   heading.style.display = "block";
   diagram.className = "diagram open";
 
-  const buttons = [...document.querySelectorAll(".word")];
-  if (!buttons.length) return;
-  const frame = diagram.getBoundingClientRect();
+  /* The diagram writes its own sentence rather than measuring the row of
+     buttons above it. The row wraps on a narrow screen and sits in a different
+     element, so arcs drawn against it came apart as soon as either moved. Here
+     the words and the arcs are one picture, laid out right to left, and it
+     scrolls sideways when a sentence is long. */
+  const words = state.words;
+  const widths = words.map((word) => Math.max(textWidth(word.diac, WORD_FONT), 30));
+  const total = widths.reduce((sum, width) => sum + width, 0) + GAP * (words.length - 1);
+  const svgWidth = total + MARGIN * 2;
+
   const centres = new Map();
-  for (const button of buttons) {
-    const box = button.getBoundingClientRect();
-    centres.set(Number(button.dataset.id), box.left - frame.left + box.width / 2);
-  }
+  let cursor = svgWidth - MARGIN;               // right edge: Arabic starts there
+  words.forEach((word, index) => {
+    centres.set(word.id, cursor - widths[index] / 2);
+    cursor -= widths[index] + GAP;
+  });
 
   const depth = new Map();
   const depthOf = (word, seen = 0) => {
     if (depth.has(word.id)) return depth.get(word.id);
-    const parent = state.words.find((candidate) => candidate.id === word.head);
+    const parent = words.find((candidate) => candidate.id === word.head);
     const value = (!parent || seen > 40) ? 0 : depthOf(parent, seen + 1) + 1;
     depth.set(word.id, value);
     return value;
@@ -543,22 +562,21 @@ function drawTree() {
 
   let tallest = 0;
   const arcs = [];
-  for (const word of state.words) {
+  for (const word of words) {
     if (!word.head) continue;
     const from = centres.get(word.id), to = centres.get(word.head);
     if (from === undefined || to === undefined) continue;
-    const span = Math.abs(from - to);
-    const height = Math.min(MAX_ARC, ARC_HEIGHT + span * 0.34 + depthOf(word) * 6);
+    const height = Math.min(MAX_ARC, ARC_HEIGHT + Math.abs(from - to) * 0.3 + depthOf(word) * 8);
     tallest = Math.max(tallest, height);
     arcs.push({ word, from, to, height });
   }
 
-  const width = Math.max(frame.width, 1);
-  const svgHeight = tallest + TOP + 22;
+  const baseline = TOP + tallest + LABEL;       // where the arcs land and the words sit
+  const svgHeight = baseline + WORD_DROP;
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("width", width);
+  svg.setAttribute("width", svgWidth);
   svg.setAttribute("height", svgHeight);
-  svg.setAttribute("viewBox", `0 0 ${width} ${svgHeight}`);
+  svg.setAttribute("viewBox", `0 0 ${svgWidth} ${svgHeight}`);
 
   const add = (name, attributes, text) => {
     const node = document.createElementNS("http://www.w3.org/2000/svg", name);
@@ -569,31 +587,50 @@ function drawTree() {
   };
 
   // the root gets a stem rather than an arc: nothing governs it
-  const root = state.words.find((word) => word.head === 0);
+  const root = words.find((word) => word.head === 0);
   if (root && centres.has(root.id)) {
-    const x = centres.get(root.id);
-    add("path", { d: `M${x} ${svgHeight} V${svgHeight - 26}`, class: "stem" });
+    add("path", { d: `M${centres.get(root.id)} ${baseline} V${baseline - 30}`, class: "stem" });
   }
 
   for (const arc of arcs) {
-    const base = svgHeight;
-    const apex = base - arc.height;
+    const apex = baseline - arc.height;
     const lit = arc.word.id === state.selected || arc.word.head === state.selected;
     add("path", {
-      d: `M${arc.from} ${base} C${arc.from} ${apex}, ${arc.to} ${apex}, ${arc.to} ${base}`,
+      d: `M${arc.from} ${baseline} C${arc.from} ${apex}, ${arc.to} ${apex}, ${arc.to} ${baseline}`,
       class: "arc" + (lit ? " lit" : (arc.word.certain ? "" : " dim")),
     });
     if (arc.word.role) {
-      const middle = (arc.from + arc.to) / 2;
       add("text", {
-        x: middle,
-        y: base - arc.height * 0.78 - 4,
+        x: (arc.from + arc.to) / 2,
+        y: baseline - arc.height * 0.75 - 5,
         class: "arclabel" + (lit ? " lit" : ""),
       }, arc.word.role);
     }
   }
 
+  words.forEach((word) => {
+    const x = centres.get(word.id);
+    const lit = word.id === state.selected;
+    add("text", {
+      x,
+      y: baseline + WORD_DROP - 8,
+      class: "treeword"
+        + (lit ? " lit" : "")
+        + (word.inserted ? " covert" : "")
+        + (word.certain ? "" : " unsure"),
+    }, word.diac);
+  });
+
   diagram.appendChild(svg);
+}
+
+/* Measured with the real font, so a long word does not sit under a short gap.
+   The canvas is made once and kept. */
+let ruler = null;
+function textWidth(text, font) {
+  if (!ruler) ruler = document.createElement("canvas").getContext("2d");
+  ruler.font = font;
+  return ruler.measureText(text).width;
 }
 
 /* ---------- wiring ---------- */

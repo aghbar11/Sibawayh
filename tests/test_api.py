@@ -393,3 +393,12 @@ def test_an_endless_conversation_is_refused(client: TestClient) -> None:
         },
     )
     assert response.status_code == 422
+
+
+def test_the_tree_draws_its_own_words() -> None:
+    """It used to measure the row of buttons above it. That row wraps on a narrow
+    screen and lives in a different element, so the arcs came apart as soon as
+    either moved. The diagram is now one picture."""
+    page = api.PAGE.read_text(encoding="utf-8")
+    assert "treeword" in page
+    assert "getBoundingClientRect" not in page
