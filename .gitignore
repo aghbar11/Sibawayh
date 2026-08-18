@@ -1,5 +1,6 @@
 # local working docs
 docs/PLAN.md
+docs/DECISIONS.md
 
 # licensed data — MUST NOT be committed (README documents the directory, nothing else)
 data/ldc/*

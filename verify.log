@@ -1,18 +1,0 @@
-Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|##########| 199/199 [00:00<00:00, 2112.42it/s]
-Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|##########| 199/199 [00:00<00:00, 12461.61it/s]
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-
-لم يقرأ محمد الكتاب
-   لم        mood=null      role=حرف جزم                rule=JUSSIVE_PARTICLE
-   يقرأ      mood=unknown   role=فعل مضارع مجزوم        rule=VERB_IMPERFECT_JUSSIVE
-             evidence=['pos=verb', 'heads_the_clause', 'aspect=imperfect', 'mood=jussive_from_governor', 'governed_by=jussive_particle']
-   محمد      mood=null      role=None                   rule=None
-   الكتاب    mood=null      role=مفعول به               rule=VERBAL_OBJECT
-
-لن يكتب الطالب الدرس
-   لن        mood=null      role=حرف نصب                rule=SUBJUNCTIVE_PARTICLE
-   يكتب      mood=unknown   role=فعل مضارع منصوب        rule=VERB_IMPERFECT_SUBJUNCTIVE
-             evidence=['pos=verb', 'heads_the_clause', 'aspect=imperfect', 'mood=subjunctive_from_governor', 'governed_by=subjunctive_particle']
-   الطالب    mood=null      role=فاعل                   rule=VERBAL_AGENT
-   الدرس     mood=null      role=مفعول به               rule=VERBAL_OBJECT
-[2026-08-18 02:23:56 WARNING] Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.

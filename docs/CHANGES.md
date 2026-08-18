@@ -70,6 +70,35 @@ Newest last.
 | 12 | 26 rules, not "roughly forty" — tier-2 roles have no gold and get none |
 | 12 | compound-role tokens live with the rule that knows the slot, not the part of speech |
 | 12 | `starter.py` removed; its two rules moved to `verbal.py` and `modifiers.py` |
+| 13 | the label inventory is 25 roles written out by hand, not the paper's 34 |
+| 13 | "exactly one agent per verb" softened — two is always an error, zero only sometimes |
+| 13 | a downgrade keeps heads and evidence; only the role, its rule and its provenance go |
+| 13 | mood/role agreement not checked; the plan asks for case only |
+
+**Why the inventory is 25 and not 34.** The plan says every label must be in the 34-label set of
+the I3rab paper. Nine of those have no rule producing them — حال، تمييز، بدل، توكيد، عطف، مفعول
+مطلق and the rest of tier 2 — and a label sitting in the inventory with nothing emitting it can
+only mask the next typo. `ROLES` is written out by hand rather than collected from the registry,
+which is the whole point: an inventory derived from the rules could never disagree with the rules.
+A test asserts it has nothing spare in it, so the two grow together.
+
+**Why a verb may have no agent.** Taken literally, "every verb has exactly one agent" fails almost
+every real sentence: undiacritized input abstains constantly, and an abstaining dependent may well
+*be* the agent. Two agents is always a contradiction and always fires. Zero fires only when every
+dependent of the verb was successfully labelled something else — at that point nothing is left to
+be the agent, and Arabic has no such verb. Abstention is never an error.
+
+**What a downgrade leaves behind.** Roles, `rule_id`, `confidence` and the `irab_role` provenance
+entry go. Heads stay, because an arc is the parser's claim rather than ours and the UI still needs
+somewhere to hang the words. `evidence` stays too: every item in it is an observation (`case=acc`,
+`verb_has_no_overt_agent`), and an observation does not become false because the conclusion drawn
+from it was thrown away.
+
+**What the validators cannot catch.** They find contradictions, not wrong answers. On real
+morphology `verbal_passive_01` still reads كتبت as active and passes every check, because an
+active reading of that sentence is internally coherent — the agent count works out, the cases
+agree, the tree is fine. Nothing here narrows the gap between 37 and 41; it only guarantees that
+what we do assert holds together.
 
 Two edits were made directly to `CLAUDE.md`, both requested: the `prc0` bullet now records that
 `d3tok` splits ال and that folding it back is the rule, and the conventions section now
