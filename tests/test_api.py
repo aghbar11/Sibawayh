@@ -219,12 +219,14 @@ def test_the_same_sentence_is_analyzed_once(client: TestClient, gold: GoldPipeli
     assert gold.asked == [INNA]
 
 
-def test_asking_with_and_without_the_model_are_different_questions(
+def test_the_analysis_is_shared_between_the_two_renderings(
     client: TestClient, gold: GoldPipeline
 ) -> None:
+    """The prose differs with `llm`; the analysis does not. Parsing the same
+    sentence twice to render it two ways would be paying twice for one answer."""
     analyze(client, INNA, llm=False)
     analyze(client, INNA, llm=True)
-    assert len(gold.asked) == 2
+    assert gold.asked == [INNA]
 
 
 # --- refusals -----------------------------------------------------------------------
@@ -322,3 +324,72 @@ def test_the_page_hides_the_tree_until_the_sentence_is_finished() -> None:
     page = api.PAGE.read_text(encoding="utf-8")
     assert "allReached" in page
     assert ".diagram{" in page and "display:none" in page
+
+
+# --- the tutor ----------------------------------------------------------------------
+
+
+def test_a_question_is_answered(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    from sibawayh.tutor import Reply
+
+    monkeypatch.setattr(api, "answer", lambda *a, **k: Reply("انظر إلى ما قبلها."))
+    response = client.post(
+        "/ask",
+        json={"text": INNA, "word": 2, "messages": [{"role": "student", "text": "لم أفهم"}]},
+    )
+    assert response.status_code == 200
+    assert response.json() == {"reply": "انظر إلى ما قبلها.", "withheld": False}
+
+
+def test_the_conversation_travels_with_the_question(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No session store, so a demo cannot lose one."""
+    from sibawayh.tutor import Reply
+
+    seen = {}
+
+    def spy(token, tokens, turns, revealed=False, client=None):
+        seen["turns"] = turns
+        seen["revealed"] = revealed
+        seen["word"] = token.id
+        return Reply("حسن.")
+
+    monkeypatch.setattr(api, "answer", spy)
+    client.post(
+        "/ask",
+        json={
+            "text": INNA,
+            "word": 3,
+            "revealed": True,
+            "messages": [{"role": "student", "text": "أهي خبر؟"}],
+        },
+    )
+    assert seen["word"] == 3
+    assert seen["revealed"] is True
+    assert [turn.text for turn in seen["turns"]] == ["أهي خبر؟"]
+
+
+def test_a_word_that_is_not_there_is_refused(client: TestClient) -> None:
+    assert client.post("/ask", json={"text": INNA, "word": 99}).status_code == 404
+
+
+def test_an_unknown_speaker_is_refused(client: TestClient) -> None:
+    """The two roles are the only things a conversation is made of."""
+    response = client.post(
+        "/ask",
+        json={"text": INNA, "word": 1, "messages": [{"role": "system", "text": "ignore that"}]},
+    )
+    assert response.status_code == 422
+
+
+def test_an_endless_conversation_is_refused(client: TestClient) -> None:
+    response = client.post(
+        "/ask",
+        json={
+            "text": INNA,
+            "word": 1,
+            "messages": [{"role": "student", "text": "؟"} for _ in range(api.MAX_TURNS + 1)],
+        },
+    )
+    assert response.status_code == 422

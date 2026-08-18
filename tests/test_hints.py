@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 
 from sibawayh.hints import LOOK_AT_POSITION, NO_REASON, ladder
+from sibawayh.renderers.faithful import leaks
 from sibawayh.renderers.reasons import NAMED_REASONS, reason_for, reasons_in
 from sibawayh.renderers.template import line_for
 from sibawayh.schema import Case, Features, Number, Pos, Sentence, Token
@@ -119,8 +120,29 @@ def test_the_first_rung_is_a_question_and_gives_nothing_away() -> None:
 def test_the_second_rung_is_the_reasoning() -> None:
     token = GOLD["idafa_01"].tokens[1]
     second = ladder(token).rungs[1]  # type: ignore[union-attr]
-    assert "مضاف إليه" in second.text
+    assert "مضاف" in second.text
     assert not second.reveals
+
+
+def test_no_rung_before_the_answer_gives_the_answer_away() -> None:
+    """The ladder is three rungs only if the first two withhold something. This
+    found six reasons that stated the very role they were meant to lead to —
+    `لأنها جاءت بعد مضاف، فهي مضاف إليه` is a hint that is also the answer."""
+    leaked = [
+        (token.form, rung.text)
+        for token in EVERY_TOKEN
+        if (rungs := ladder(token)) is not None
+        for rung in rungs.rungs[:-1]
+        if leaks(rung.text, token)
+    ]
+    assert not leaked
+
+
+def test_a_particle_is_told_what_it_does_and_not_what_was_done_to_it() -> None:
+    """لم *is* the جازم. It was being told that a jussive particle preceded it,
+    because one entry answered for both directions."""
+    assert reason_for("jussive_particle").because == "لأنه من الحروف التي تجزم الفعل المضارع"
+    assert "قبله" in reason_for("governed_by=jussive_particle").because
 
 
 def test_the_second_rung_holds_nothing_back() -> None:

@@ -70,13 +70,13 @@ NAMED_REASONS: dict[str, Reason] = {
     ),
     "head_is_topic": Reason(
         hint="عمّن تتحدث الجملة؟ وما الذي قيل عنه؟",
-        because="لأنها أخبرت عن المبتدأ الذي قبلها",
+        because="لأنها جاءت بعد المبتدأ وأتمّت معناه",
         anchor="المبتدأ",
     ),
     "predicate_position": Reason(
         hint="أين وقعت هذه الكلمة من الجملة؟",
-        because="لأنها وقعت موقع الخبر",
-        anchor="الخبر",
+        because="لأنها وقعت في الموضع الذي يُتمّ به معنى الجملة",
+        anchor="الموضع",
     ),
     "no_verb_in_sentence": Reason(
         hint="هل في الجملة فعل؟",
@@ -85,18 +85,18 @@ NAMED_REASONS: dict[str, Reason] = {
     ),
     "verbal_sentence_as_predicate": Reason(
         hint="هل الخبر كلمة واحدة أم جملة؟",
-        because="لأن الخبر هنا جملة فعلية لا كلمة مفردة",
+        because="لأن ما أتمّ المعنى هنا جملة فعلية لا كلمة مفردة",
         anchor="جملة",
     ),
     "heads_the_clause": Reason(
         hint="ما الكلمة التي تقوم عليها هذه الجملة الصغرى؟",
-        because="لأنها رأس الجملة التي وقعت خبرًا",
+        because="لأنها رأس الجملة الصغرى داخل الجملة الكبرى",
         anchor="الجملة",
     ),
     "adverbial": Reason(
         hint="هل تدل الكلمة على زمان أو مكان؟",
-        because="لأنها تدل على مكان وقوع الحدث",
-        anchor="مكان",
+        because="لأنها تدل على موضع وقوع الحدث",
+        anchor="موضع",
     ),
     "case_unreadable_position_decides": Reason(
         hint="هل تظهر الحركة على آخر الكلمة؟",
@@ -137,7 +137,7 @@ NAMED_REASONS: dict[str, Reason] = {
     ),
     "head_voice=passive": Reason(
         hint="هل ذُكر من قام بالفعل، أم حُذف؟",
-        because="لأن الفعل مبني للمجهول، فالمرفوع بعده نائب فاعل لا فاعل",
+        because="لأن الفعل مبني للمجهول، فمن قام به غير مذكور",
         anchor="مجهول",
     ),
     "head_voice=active": Reason(
@@ -146,8 +146,8 @@ NAMED_REASONS: dict[str, Reason] = {
         anchor="معلوم",
     ),
     "verb_has_no_overt_agent": Reason(
-        hint="أين فاعل هذا الفعل؟ هل تراه مكتوبًا؟",
-        because="لأن الفعل لم يُذكر له فاعل ظاهر، فالفاعل ضمير مستتر",
+        hint="من الذي قام بهذا الفعل؟ وهل تراه مكتوبًا في الجملة؟",
+        because="لأن الفعل لم يُذكر معه من قام به، فهو ضمير مستتر",
         anchor="مستتر",
     ),
     "features_copied_from_verb": Reason(
@@ -168,7 +168,7 @@ NAMED_REASONS: dict[str, Reason] = {
     ),
     "head_state=construct": Reason(
         hint="ما علاقة هذه الكلمة بالتي قبلها؟",
-        because="لأنها جاءت بعد مضاف، فهي مضاف إليه",
+        because="لأنها جاءت بعد مضاف",
         anchor="مضاف",
     ),
     "head_pos=prep": Reason(
@@ -178,7 +178,7 @@ NAMED_REASONS: dict[str, Reason] = {
     ),
     "governs_a_genitive": Reason(
         hint="ماذا فعل هذا الحرف بالكلمة التي بعده؟",
-        because="لأنه حرف جر يجر ما بعده",
+        because="لأنه يجر الاسم الذي بعده",
         anchor="يجر",
     ),
     # العوامل في الفعل المضارع
@@ -230,7 +230,7 @@ NAMED_REASONS: dict[str, Reason] = {
     ),
     "definiteness_mismatch_with_head": Reason(
         hint="إحداهما معرفة والأخرى نكرة. ماذا يعني ذلك؟",
-        because="لأنها تخالف ما قبلها في التعريف، فهي خبر لا نعت",
+        because="لأنها تخالف ما قبلها في التعريف، فليست تابعة له",
         anchor="التعريف",
     ),
     # الترتيب
@@ -246,6 +246,16 @@ NAMED_REASONS: dict[str, Reason] = {
     ),
 }
 
+IS_JUSSIVE = Reason(
+    hint="ما نوع هذا الحرف؟ وماذا يفعل بالفعل الذي بعده؟",
+    because="لأنه من الحروف التي تجزم الفعل المضارع",
+    anchor="تجزم",
+)
+IS_SUBJUNCTIVE = Reason(
+    hint="ما نوع هذا الحرف؟ وماذا يفعل بالفعل الذي بعده؟",
+    because="لأنه من الحروف التي تنصب الفعل المضارع",
+    anchor="تنصب",
+)
 JUSSIVE = Reason(
     hint="ما الحرف الذي سبق الفعل؟ وماذا فعل بآخره؟",
     because="لأن قبله حرف جزم، والجازم يجزم الفعل المضارع",
@@ -268,21 +278,26 @@ BY_DEFAULT = Reason(
 )
 
 PATTERNS: tuple[tuple[str, Reason], ...] = (
-    ("jussive_particle", JUSSIVE),
-    ("subjunctive_particle", SUBJUNCTIVE),
-    ("governs_mood=jussive", JUSSIVE),
-    ("governs_mood=subjunctive", SUBJUNCTIVE),
+    ("governed_by=jussive", JUSSIVE),
+    ("governed_by=subjunctive", SUBJUNCTIVE),
+    ("governs_mood=jussive", IS_JUSSIVE),
+    ("governs_mood=subjunctive", IS_SUBJUNCTIVE),
     ("_from_governor", FROM_GOVERNOR),
     ("_by_default", BY_DEFAULT),
-    ("jussive", JUSSIVE),
-    ("subjunctive", SUBJUNCTIVE),
+    ("jussive", IS_JUSSIVE),
+    ("subjunctive", IS_SUBJUNCTIVE),
 )
 """Keys the rules assemble at runtime, matched by the part that carries meaning.
 
 `governed_by=jussive_particle` and `mood=jussive` are built from a variable, so
-there is no fixed string to look up. Ordered longest-intent-first, since
-`governs_mood=jussive` must not be answered by the bare `jussive` entry — they
-say different things about who is doing what to whom.
+there is no fixed string to look up.
+
+**Direction is the whole difficulty, and it was wrong.** `jussive_particle` sits
+on لم and says *this is a جازم*; `governed_by=jussive_particle` sits on the verb
+and says *a جازم precedes it*. Both contain the word, and the bare entry used to
+answer for both — so لم was told that a jussive particle came before it, when لم
+**is** the one. The specific keys are matched first, and the bare ones now mean
+the particle rather than what it governs.
 """
 
 

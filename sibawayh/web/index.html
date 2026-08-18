@@ -187,6 +187,36 @@ button[disabled]{opacity:.55;cursor:progress}
 .guess .caution{margin-top:.6em;color:var(--rubric);font-size:.95rem}
 .word.done{border-bottom-color:var(--gold)}
 
+/* ---------- talking to the tutor ---------- */
+.talk{margin-top:18px;border-top:1px dashed var(--wash);padding-top:14px}
+.talk h3{
+  margin:0 0 10px;font-size:1rem;font-weight:400;color:var(--moss);
+  letter-spacing:.03em;
+}
+.turns{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.turn{
+  padding:.55em .85em;border-radius:3px;font-size:1.05rem;line-height:1.8;
+  max-width:88%;animation:settle .18s ease-out;
+}
+.turn.student{
+  align-self:flex-start;background:rgba(61,107,79,.12);
+  border:1px solid var(--wash);
+}
+.turn.teacher{
+  align-self:flex-end;background:rgba(255,255,255,.72);
+  border:1px solid var(--wash);border-inline-end:3px solid var(--moss);
+}
+.turn.held{border-inline-end-color:var(--gold);background:rgba(168,129,63,.10)}
+.turn.thinking{color:var(--sage)}
+.saying{display:flex;gap:8px}
+.saying input{
+  flex:1;font-family:var(--serif);font-size:1.05rem;padding:.45em .7em;
+  color:var(--ink);background:rgba(255,255,255,.6);
+  border:1px solid var(--wash);border-radius:3px;
+}
+.saying input:focus{outline:none;border-color:var(--moss)}
+.saying button{font-size:1rem;padding:.4em 1em}
+
 footer{text-align:center;margin-top:26px;color:var(--ink-soft);font-size:.9rem;opacity:.85}
 footer .src{color:var(--moss)}
 
@@ -239,7 +269,10 @@ const EXAMPLES = [
 ];
 
 const el = (id) => document.getElementById(id);
-const state = { words: [], selected: null, revealed: 0, seen: new Set() };
+const state = { words: [], selected: null, revealed: 0, seen: new Set(), talk: new Map() };
+/* `talk` holds one conversation per word. It lives here rather than on the
+   server: the analysis is cached there, so a turn carries the sentence and the
+   history and needs no session to look anything up. */
 /* `seen` holds the ids whose إعراب the student has actually reached. The tree is
    the shape of the whole answer, so showing it early hands over every remaining
    word at once — it is the reward for finishing, not the starting point. */
@@ -280,7 +313,8 @@ function say(message, bad = false) {
 }
 
 function clear() {
-  state.words = []; state.selected = null; state.revealed = 0; state.seen = new Set();
+  state.words = []; state.selected = null; state.revealed = 0;
+  state.seen = new Set(); state.talk = new Map();
   el("line").innerHTML = ""; el("diagram").innerHTML = "";
   el("panel").className = "panel"; el("src").textContent = "";
   el("diagram").className = "diagram";
@@ -362,10 +396,12 @@ function drawPanel() {
     + `</ul>`
     + `<div class="actions">`
     + (last ? "" : `<button type="button" id="more">تلميح آخر</button>`)
-    + `<button type="button" class="quiet" id="all">${last ? "إخفاء" : "أظهر الإعراب"}</button>`
-    + `</div>`;
+    + `<button type="button" class="quiet" id="all">${last ? "إخفاء" : "إظهار"}</button>`
+    + `</div>`
+    + talkBox(word, last);
 
   if (last) reached(word);
+  wireTalk(word, last);
 
   const more = el("more");
   if (more) more.addEventListener("click", () => { state.revealed += 1; drawPanel(); });
@@ -373,6 +409,81 @@ function drawPanel() {
     state.revealed = last ? 1 : word.hints.length;
     drawPanel();
   });
+}
+
+/* ---------- the conversation ---------- */
+
+function turnsFor(id) {
+  if (!state.talk.has(id)) state.talk.set(id, []);
+  return state.talk.get(id);
+}
+
+function talkBox(word, revealed) {
+  const turns = turnsFor(word.id);
+  const spoken = turns.map((turn) =>
+    `<div class="turn ${turn.role}${turn.withheld ? " held" : ""}">${escapeHtml(turn.text)}</div>`
+  ).join("");
+  return `<div class="talk">`
+    + `<h3>${revealed ? "اسأل عن هذا الإعراب" : "لم تفهم بعد؟ اسأل، ولن يُذكر لك الجواب"}</h3>`
+    + `<div class="turns" id="turns">${spoken}</div>`
+    + `<div class="saying">`
+    + `<input id="say" type="text" autocomplete="off" placeholder="اكتب سؤالك…">`
+    + `<button type="button" id="send">اسأل</button>`
+    + `</div></div>`;
+}
+
+function escapeHtml(text) {
+  const box = document.createElement("div");
+  box.textContent = text;
+  return box.innerHTML;
+}
+
+function wireTalk(word, revealed) {
+  const say = el("say"), send = el("send");
+  if (!say || !send) return;
+  const ask = () => askTutor(word, revealed, say.value.trim());
+  send.addEventListener("click", ask);
+  say.addEventListener("keydown", (event) => { if (event.key === "Enter") ask(); });
+}
+
+async function askTutor(word, revealed, question) {
+  if (!question) return;
+  const turns = turnsFor(word.id);
+  turns.push({ role: "student", text: question });
+  drawPanel();
+
+  const box = el("turns");
+  if (box) {
+    const waiting = document.createElement("div");
+    waiting.className = "turn teacher thinking";
+    waiting.textContent = "…";
+    box.appendChild(waiting);
+  }
+  const say = el("say");
+  if (say) { say.disabled = true; say.focus(); }
+
+  try {
+    const response = await fetch("/ask", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        text: el("text").value.trim(),
+        word: word.id,
+        revealed,
+        messages: turns.map(({ role, text }) => ({ role, text })),
+      }),
+    });
+    const body = await response.json();
+    turns.push({
+      role: "teacher",
+      text: response.ok ? body.reply : "تعذّر السؤال الآن.",
+      withheld: Boolean(body.withheld),
+    });
+  } catch {
+    turns.push({ role: "teacher", text: "تعذّر الوصول إلى المساعد." });
+  }
+  drawPanel();
+  el("say")?.focus();
 }
 
 /* A suggestion is the model's, not the rules'. It is drawn as a different kind of

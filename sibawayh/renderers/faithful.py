@@ -136,6 +136,22 @@ def is_grounded(reply: str, token: Token) -> bool:
     return any(appears_in(reply, anchor) for anchor in anchors)
 
 
+def leaks(text: str, token: Token) -> bool:
+    """Whether `text` gives away the answer for `token`.
+
+    The inverse of the check above, and the one a hint needs. A model asked to
+    hint at اسم إنّ will write *"it follows إنّ, so it is اسم إنّ منصوب"* — fluent,
+    correct, and it has just answered the question it was asked to hint at.
+    Nothing would flag that, because the output looks better than a real hint.
+
+    The role and the case are what may not appear. The sign is not checked: a
+    hint that mentions الضمة is a strong hint and not the answer, and forbidding
+    it would leave almost nothing sayable about a word's ending.
+    """
+    facts = facts_of(token)
+    return any(appears_in(text, fact) for fact in (facts.role, facts.case) if fact)
+
+
 def is_faithful(reply: str, token: Token) -> bool:
     """Whether `reply` may be shown to a student in place of the template line."""
     return not missing_from(reply, facts_of(token)) and is_grounded(reply, token)

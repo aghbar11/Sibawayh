@@ -103,6 +103,14 @@ Newest last.
 | 17 | a suggestion lives in its own field and never in `irab_role` |
 | 17 | the tree is hidden until every word has been reached |
 | 5 | `form` comes from the input again, not from the chosen analysis — إن stays إن |
+| 17 | the model words the two teaching rungs; the ladder still decides what they may say |
+| 17 | `faithful.leaks` — a rung that names the role or the case is thrown away |
+| 16 | six reasons reworded: they stated the very role they were meant to lead to |
+| 16 | **fixed** — لم was told a jussive particle preceded it; لم *is* the جازم |
+| 18 | `tutor.py` + `POST /ask` — a conversation about one word |
+| 18 | while the answer is hidden it is **not sent**; the reply is leak-checked as well |
+| 18 | two refusals and the reply is replaced with a line pointing at «إظهار» |
+| 18 | the conversation lives on the page; the server keeps no session |
 
 **Why the inventory is 25 and not 34.** The plan says every label must be in the 34-label set of
 the I3rab paper. Nine of those have no rule producing them — حال، تمييز، بدل، توكيد، عطف، مفعول
@@ -409,6 +417,73 @@ selecting one — which is a different capability and would need a provenance va
 **`GeminiClient` was split out of `GeminiRenderer`** when the second caller arrived. Suggesting a
 role is a different task with a different prompt, and it has no business reimplementing quota
 handling to get one.
+
+**The model now words the hints, and still does not decide them.** The ladder says what each rung
+may contain; the model says it warmly and about this sentence rather than about the category; and
+`faithful.leaks` checks afterwards that the answer did not appear. A rung that leaks is discarded
+and the table's wording stands — correct, stiff, and not a spoiler.
+
+The check is the inverse of the one on the إعراب line, and it exists because this failure looks like
+success. Asked to hint at اسم إنّ, a model writes *"it follows إنّ, so it is اسم إنّ منصوب"* — fluent,
+accurate, and it has answered the question it was asked to hint at. The teaching collapses into
+telling and the output looks *better*, not worse.
+
+The answer rung is never sent. It is the إعراب line the renderer already produced, and asking twice
+would let the two disagree — a ladder whose last rung differs from the line beside the word is one a
+student stops trusting. `Word.hints` now ends with exactly `Word.irab`, which it did not before when
+the model wrote the line and the table wrote the ladder.
+
+One call per sentence, cached with the analysis. Three rungs times six words is eighteen requests if
+each tap asks, and the free tier would be gone in two sentences.
+
+**Applying the check to our own table found six leaks and one wrong answer.** Six `because` strings
+stated the role they were supposed to lead to — `لأنها جاءت بعد مضاف، فهي مضاف إليه` is a hint that
+is also the answer, which makes a three-rung ladder into a two-rung one wearing three. They were
+reworded to stop short.
+
+Two of the six leaked by accident of Arabic morphology rather than by intent: `أخبرت` contains the
+letters of `خبر`, and `مكان` in *مكان وقوع الحدث* is the whole of the role `ظرف مكان`. Letter
+matching does not know a word from a substring of one, and that is the right conservatism here.
+
+The wrong answer was worse. `لم` carries the evidence `jussive_particle`, meaning *this is a جازم*,
+and the verb carries `governed_by=jussive_particle`, meaning *a جازم precedes it*. Both contain the
+word, one entry answered for both, and لم was being told that a jussive particle came before it —
+when لم is the one. Direction now has its own entries.
+
+**The student can now argue with the tutor, and it still will not tell them.** Three fixed rungs are
+not always what a stuck student needs; sometimes they want to say *لماذا ليست مبتدأ؟*, or try an
+answer and be told whether they are warm.
+
+**The answer is withheld by not sending it.** Until إظهار is pressed the payload carries the word,
+its morphology, the observations the rule made, and the roles of the *other* words — everything
+except this word's role, case, sign and line. A model cannot leak what it was never told.
+
+That is the strong half. The weak half is that it can still work the answer out: a noun after إنّ is
+not a hard puzzle for something that knows Arabic. So every reply is leak-checked with the same
+`faithful.leaks` the hints use, refused once with the failure named, and on a second refusal
+replaced with a fixed sentence pointing at the button. The contract holds even when the model does
+not.
+
+Measured against the real endpoint, asked three ways in a row:
+
+    ما إعرابها؟            → زر الإظهار أمامك متى أردته. تأمل الحرف الذي يسبقها…
+    قل لي الجواب مباشرة    → زر الإظهار أمامك متى أردته. تذكّر أن الحرف الذي يسبق الكلمة ينصب ما بعده.
+    أهي مبتدأ؟             → ليست بمبتدأ، فالحرف الذي يسبقها يغير حكم ما بعده.
+
+It refused a direct demand, varied the clue rather than repeating it, and corrected a wrong guess
+without naming the right one. After إظهار the withholding stops entirely — the answer is on the
+screen, and pretending otherwise would make the tutor useless exactly when the student finally
+wants to talk about it.
+
+**No session store.** The conversation lives on the page and travels with each question; the
+analysis is recovered from the cache. A demo that needs no session cannot lose one, and the whole
+thing is testable by handing it a list of turns. The history is capped at twelve turns — long enough
+to follow an argument, short enough that a tab left open cannot become a request nobody can afford.
+
+**`_analyzed` was added alongside the existing cache.** Every turn of a conversation needs the same
+analysis, and reanalyzing per turn would also let the tutor drift from the page in front of the
+student. A side effect: asking with and without the model now shares one analysis instead of parsing
+the sentence twice to render it two ways.
 
 Two edits were made directly to `CLAUDE.md`, both requested: the `prc0` bullet now records that
 `d3tok` splits ال and that folding it back is the rule, and the conventions section now
