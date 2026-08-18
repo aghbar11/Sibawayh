@@ -25,11 +25,17 @@ Where neither has one there is nothing to say, and `None` is returned. A ماض�
 comes back `unknown` — all three are the same answer here, and the caller decides
 what to do with the silence.
 
-**Verbs are looked up by role, not by `feats.mood`.** يقرأُ، يقرأَ and يقرأْ are
-spelled identically, so morphology reports `mood=unknown` on almost every
-undiacritized مضارع. The rule that assigned the role is what recovered the mood,
-from the governing particle — so the role is the authority, and reading `feats`
-here would throw away the one layer that knew.
+**Verbs are looked up by role first, and only then by `feats.mood`.** يقرأُ،
+يقرأَ and يقرأْ are spelled identically, so morphology reports `mood=unknown` on
+almost every undiacritized مضارع. The rule that assigned the role is what
+recovered the mood, from the governing particle, so the role is the authority
+wherever it states one.
+
+It does not always state one. `خبر — جملة فعلية` names the clause a verb heads
+and says nothing about the verb, and يقرأ in الولد يقرأ is a perfectly ordinary
+مضارع مرفوع that would otherwise come out with no inflection at all. So the mood
+is the second place to look, before the case and for the same reason: it is what
+the token itself reports when nothing better is available.
 """
 
 from __future__ import annotations
@@ -94,17 +100,30 @@ tell a student a case the validators would have refused. Roles absent from it �
 """
 
 
-def inflection_for(role: str | None, case: Case | None = None) -> Inflection | None:
+def inflection_for(
+    role: str | None,
+    case: Case | None = None,
+    mood: Mood | None = None,
+) -> Inflection | None:
     """What to call this word's inflection, or `None` if there is nothing to call.
 
-    The role wins where it has an opinion, because a role's case is a grammatical
-    fact and a read case is a guess about an ending. `case` is the fallback, and
-    it is what carries صفة, whose case is the noun's rather than the role's.
+    Three sources, in order. The role wins where it has an opinion, because a
+    role's case is a grammatical fact and a read case is a guess about an ending.
+    Then the mood, which carries a verb whose role names its clause rather than
+    itself. Then the case, which carries صفة, whose case is the noun's rather
+    than the role's.
+
+    A word can have a mood or a case but never both, so the order between the
+    last two settles nothing in practice and is only there to be definite.
     """
     if role is not None:
         fixed = ROLE_INFLECTION.get(role)
         if fixed is not None:
             return fixed
+    if mood is not None:
+        named = MOOD_NAME.get(mood)
+        if named is not None:
+            return named
     if case is None:
         return None
     return CASE_NAME.get(case)

@@ -116,3 +116,21 @@ def test_inflections_are_frozen() -> None:
 
     with pytest.raises(dataclasses.FrozenInstanceError):
         CASE_NAME[Case.NOM].adjective = "منصوب"  # type: ignore[misc]
+
+
+def test_a_verb_whose_role_names_its_clause_falls_back_to_its_mood() -> None:
+    """`خبر — جملة فعلية` describes the clause a verb heads and says nothing
+    about the verb. يقرأ in الولد يقرأ is an ordinary مضارع مرفوع, and without
+    this it would come out with no inflection at all."""
+    assert inflection_for("خبر — جملة فعلية", None, Mood.INDICATIVE) == CASE_NAME[Case.NOM]
+
+
+def test_the_role_still_beats_the_mood() -> None:
+    """The rule recovered the mood from the عامل; morphology usually could not
+    read it, and where they disagree the rule is the one that knew."""
+    assert inflection_for("فعل مضارع مجزوم", None, Mood.INDICATIVE) == MOOD_NAME[Mood.JUSSIVE]
+
+
+def test_an_unreadable_mood_is_silence_not_a_default() -> None:
+    assert inflection_for("خبر — جملة فعلية", None, Mood.UNKNOWN) is None
+    assert inflection_for("خبر — جملة فعلية", None, Mood.NULL) is None
