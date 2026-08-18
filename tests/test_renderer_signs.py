@@ -41,14 +41,14 @@ def test_a_singular_noun_declines_with_harakat() -> None:
 
 def test_the_three_harakat() -> None:
     word = noun("الكِتابُ")
-    assert sign_for(word, CASE_NAME[Case.NOM]) == Sign("الضمة الظاهرة على آخره")
-    assert sign_for(word, CASE_NAME[Case.ACC]) == Sign("الفتحة الظاهرة على آخره")
-    assert sign_for(word, CASE_NAME[Case.GEN]) == Sign("الكسرة الظاهرة على آخره")
+    assert sign_for(word, CASE_NAME[Case.NOM]) == Sign("الضمة الظاهرة على آخره", "الضمة")
+    assert sign_for(word, CASE_NAME[Case.ACC]) == Sign("الفتحة الظاهرة على آخره", "الفتحة")
+    assert sign_for(word, CASE_NAME[Case.GEN]) == Sign("الكسرة الظاهرة على آخره", "الكسرة")
 
 
 def test_a_jussive_verb_is_signed_by_a_sukun() -> None:
     verb = Token(id=1, form="يَكْتُبْ", diac="يَكْتُبْ", pos=Pos.VERB, feats=Features(num=Number.S))
-    assert sign_for(verb, MOOD_NAME[Mood.JUSSIVE]) == Sign("السكون")
+    assert sign_for(verb, MOOD_NAME[Mood.JUSSIVE]) == Sign("السكون", "السكون")
 
 
 def test_a_broken_plural_declines_like_a_singular() -> None:
@@ -68,11 +68,11 @@ def test_it_takes_a_letter_and_says_why() -> None:
     """The whole reason this table exists. A template that always printed الفتحة
     for an accusative would be confidently wrong about this word."""
     plural = noun("العِراقِيِّينَ", lemma="عِراقِيّ", num=Number.P)
-    assert sign_for(plural, CASE_NAME[Case.ACC]) == Sign("الياء لأنه جمع مذكر سالم")
-    assert sign_for(plural, CASE_NAME[Case.GEN]) == Sign("الياء لأنه جمع مذكر سالم")
+    assert sign_for(plural, CASE_NAME[Case.ACC]) == Sign("الياء لأنه جمع مذكر سالم", "الياء")
+    assert sign_for(plural, CASE_NAME[Case.GEN]) == Sign("الياء لأنه جمع مذكر سالم", "الياء")
 
     nominative = noun("قادِرونَ", lemma="قادِر", num=Number.P)
-    assert sign_for(nominative, CASE_NAME[Case.NOM]) == Sign("الواو لأنه جمع مذكر سالم")
+    assert sign_for(nominative, CASE_NAME[Case.NOM]) == Sign("الواو لأنه جمع مذكر سالم", "الواو")
 
 
 def test_a_plural_noun_has_no_mood_to_be_signed_for() -> None:
@@ -141,7 +141,7 @@ def test_the_alef_of_tanween_is_not_a_final_alef() -> None:
     accusative noun would lose its sign."""
     word = noun("رائِعاً", lemma="رائِع")
     assert declension_of(word) is Declension.SOUND
-    assert sign_for(word, CASE_NAME[Case.ACC]) == Sign("الفتحة الظاهرة على آخره")
+    assert sign_for(word, CASE_NAME[Case.ACC]) == Sign("الفتحة الظاهرة على آخره", "الفتحة")
 
 
 def test_a_word_that_is_only_an_alef_is_left_alone() -> None:
@@ -179,4 +179,4 @@ def test_signs_are_frozen() -> None:
     import dataclasses
 
     with pytest.raises(dataclasses.FrozenInstanceError):
-        Sign("الضمة").text = "الفتحة"  # type: ignore[misc]
+        Sign("الضمة", "الضمة").text = "الفتحة"  # type: ignore[misc]

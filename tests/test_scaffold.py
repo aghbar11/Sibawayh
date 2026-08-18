@@ -10,6 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 MODULES = [
     "sibawayh",
     "sibawayh.arcs",
+    "sibawayh.config",
     "sibawayh.covert",
     "sibawayh.morphology",
     "sibawayh.normalize",

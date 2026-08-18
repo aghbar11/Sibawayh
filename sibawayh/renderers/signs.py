@@ -70,19 +70,28 @@ class Sign:
     """The words naming a case's sign, ready to follow *وعلامة رفعه*."""
 
     text: str
+    """The whole clause: *الضمة الظاهرة على آخره*."""
+
+    mark: str
+    """The mark or letter alone: *الضمة*.
+
+    Held separately rather than sliced off `text`, because it is what a model's
+    rewrite of this line has to be checked against, and a check that depends on
+    where the spaces fall is a check that will one day pass for the wrong reason.
+    """
 
 
 SIGN: dict[Declension, dict[Inflection, Sign]] = {
     Declension.SOUND: {
-        CASE_NAME[Case.NOM]: Sign("الضمة الظاهرة على آخره"),
-        CASE_NAME[Case.ACC]: Sign("الفتحة الظاهرة على آخره"),
-        CASE_NAME[Case.GEN]: Sign("الكسرة الظاهرة على آخره"),
-        MOOD_NAME[Mood.JUSSIVE]: Sign("السكون"),
+        CASE_NAME[Case.NOM]: Sign("الضمة الظاهرة على آخره", "الضمة"),
+        CASE_NAME[Case.ACC]: Sign("الفتحة الظاهرة على آخره", "الفتحة"),
+        CASE_NAME[Case.GEN]: Sign("الكسرة الظاهرة على آخره", "الكسرة"),
+        MOOD_NAME[Mood.JUSSIVE]: Sign("السكون", "السكون"),
     },
     Declension.MASCULINE_PLURAL: {
-        CASE_NAME[Case.NOM]: Sign("الواو لأنه جمع مذكر سالم"),
-        CASE_NAME[Case.ACC]: Sign("الياء لأنه جمع مذكر سالم"),
-        CASE_NAME[Case.GEN]: Sign("الياء لأنه جمع مذكر سالم"),
+        CASE_NAME[Case.NOM]: Sign("الواو لأنه جمع مذكر سالم", "الواو"),
+        CASE_NAME[Case.ACC]: Sign("الياء لأنه جمع مذكر سالم", "الياء"),
+        CASE_NAME[Case.GEN]: Sign("الياء لأنه جمع مذكر سالم", "الياء"),
     },
 }
 """Every sign this table is willing to name.

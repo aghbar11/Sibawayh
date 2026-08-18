@@ -25,7 +25,7 @@ from collections.abc import Sequence
 from sibawayh import __version__
 from sibawayh.arcs import normalize_arcs
 from sibawayh.covert import insert_covert_pronouns
-from sibawayh.renderers import describe
+from sibawayh.renderers import Renderer, describe
 from sibawayh.renderers.template import TemplateRenderer
 from sibawayh.rules import apply_rules
 from sibawayh.schema import Sentence, Token
@@ -121,13 +121,13 @@ UNCERTAIN = "— لم تتضح"
 and not analyzed, which is a different thing from the word being skipped."""
 
 
-def format_irab(sentence: Sentence) -> str:
+def format_irab(sentence: Sentence, renderer: Renderer | None = None) -> str:
     """The إعراب of every token, one line each, word first.
 
     The renderer returns the analysis alone; putting the word in front of it is
     the caller's job, and this is the caller.
     """
-    rendering = describe(sentence.tokens, TemplateRenderer())
+    rendering = describe(sentence.tokens, renderer or TemplateRenderer())
     words = [token.diac or token.form for token in sentence.tokens]
     width = max((display_width(word) for word in words), default=0)
     return "\n".join(
@@ -177,6 +177,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="skip normalization and pass the text to the analyzer as typed",
     )
+    irab.add_argument(
+        "--llm",
+        action="store_true",
+        help="rephrase each line as teaching prose with Gemini (needs $GEMINI_API_KEY)",
+    )
     irab.add_argument("--json", action="store_true", help="print the Sentence as JSON")
     return parser
 
@@ -220,7 +225,12 @@ def _irab(args: argparse.Namespace) -> int:
     if args.json:
         print(analyzed.model_dump_json(indent=2))
     else:
-        print(format_irab(analyzed))
+        renderer: Renderer = TemplateRenderer()
+        if args.llm:
+            from sibawayh.renderers.gemini import GeminiRenderer
+
+            renderer = GeminiRenderer()
+        print(format_irab(analyzed, renderer))
     return 0
 
 

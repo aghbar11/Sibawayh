@@ -86,6 +86,12 @@ Newest last.
 | 15 | a مبني word's محل comes from the role alone, never from a read case or mood |
 | 15 | signs are named for two declension classes only; the rest stop after the case |
 | 15 | `python -m sibawayh irab` runs the whole pipeline and prints the إعراب |
+| 15 | `GeminiRenderer` — the model rephrases the template's lines and does nothing else |
+| 15 | every reply is checked for the role, the case and the sign before it is shown |
+| 15 | `config.py` added — the key lives in `.env`, and nothing is written to `os.environ` |
+| 15 | no SDK; one POST over `urllib`, transport injected so the tests never spend quota |
+| 15 | the default is three lite models swept in order, not `gemini-flash-latest` |
+| — | `Sign` carries `mark` as its own field, for the check to compare against |
 
 **Why the inventory is 25 and not 34.** The plan says every label must be in the 34-label set of
 the I3rab paper. Nine of those have no rule producing them — حال، تمييز، بدل، توكيد، عطف، مفعول
@@ -235,6 +241,70 @@ no mood, because the role `خبر — جملة فعلية` claims the token for 
 that rule states nothing about the verb, while morphology reports `mood=unknown` as it does for
 every undiacritized مضارع. The renderer is right to stop; the mood is missing before it arrives.
 And إن still displays as أَنَّ, which is the open `form` defect recorded earlier.
+
+**The model says the answer out loud, and has no other power.** The interface allowed two safe
+ones — rephrasing, and vetoing an analysis it disbelieved — and only the first was built, because
+that was the decision. So the model is never asked what a word is. It receives the finished
+analysis and is asked to say it again for a student:
+
+    كَتَبَ:   يا بني كلمة كتب فعل ماض مبني على الفتح لأنه يدل على حدث انتهى في الزمن الماضي
+    الطالِبُ: وكلمة الطالب فاعل مرفوع وعلامة رفعه الضمة الظاهرة على آخره لأنه هو من قام بكتابة المقالة
+
+The facts in those lines are the template's, unchanged. The second half of each sentence is what
+the model added, and it is the whole reason for asking one.
+
+**The payload is the finished analysis, including the template's own line.** `evidence.py` sends
+the role, the case, the sign, the observations the rule fired on, the head word, and the line the
+template already built. Including the correct answer is deliberate: it turns the task from *analyze
+this word* into *rewrite this sentence*, and the second is the one a model is reliable at. Nothing
+in the payload is prose, so the same structure can be checked against the reply afterwards.
+
+**Three facts have to survive the rewrite** — the role, the case, the sign. Everything else may
+change, since a friendlier register is the point. Comparison is on bare letters, so منصوبٌ is not
+read as disagreeing with منصوب.
+
+A fact of several words is matched word by word, each after the last, rather than as one phrase.
+Asked about إنّ the model wrote **حرف توكيد ونصب**, which is more complete than our own حرف نصب and
+which a contiguous match rejected. A word inside a longer one counts, because ونصب contains نصب and
+failing a reply for having a conjunction in it would be absurd. This is a check for drift and not a
+parser: it catches مرفوع where the analysis said منصوب, which is what a careless rewrite actually
+does.
+
+**Every failure ends at the template line.** No key, no network, a rate limit, an unreadable reply,
+a line that changed the case — each falls back, and only the affected line does. The worst outcome
+is prose that reads like a textbook instead of a teacher, and a wrong answer is not among the
+outcomes.
+
+**What the free tier actually returns, measured against the real endpoint.** The quota is per model
+per day, and the 429 body names it exactly — `GenerateRequestsPerDayPerProjectPerModel-FreeTier`,
+`quotaValue: 20`, `model: gemini-3.7-flash`. That is what `gemini-flash-latest` resolves to: an
+alias onto the newest model, with the smallest allowance of any of them. It is a poor default for
+a job that is rephrasing rather than reasoning.
+
+So the default is three lite models tried in order. The buckets are separate, so a model that has
+spent its day is skipped instantly rather than waited for — pausing would only make a student wait
+to be refused again — and the pause is kept for the congestion case, where `503 UNAVAILABLE` clears
+in a moment. Also observed: `gemini-2.5-flash` and `gemini-2.5-flash-lite` now answer *this model
+is no longer available*, so pinning an old name is not a way to avoid this.
+
+**Two defects that only a real call could find**, which is why the key went in before the commit
+rather than after:
+
+* The faithfulness check rejected حرف توكيد ونصب, as above.
+* A 503 on the *retry* was discarding the first reply wholesale, including two lines that had
+  already passed. The retry is an improvement, not a prerequisite, and losing it may not also lose
+  what was already good.
+
+**The key lives in `.env`.** `config.py` reads the real environment first and the file second, so
+exporting a key for one command overrides the file without editing it; the file is searched for
+upwards from the working directory; and nothing is ever written back to `os.environ`, because a
+library that edits the environment of the program that imported it surprises someone eventually.
+`.gitignore` has covered `.env` since the repository was set up, and a test asserts it still does —
+that line is the only thing standing between a key and a public commit.
+
+**No SDK.** One POST to one endpoint over `urllib`, so no dependency and no licence question is
+added to a project that tracks both carefully. The transport is injected, which is why every test
+runs offline and none of them spend quota.
 
 Two edits were made directly to `CLAUDE.md`, both requested: the `prc0` bullet now records that
 `d3tok` splits ال and that folding it back is the rule, and the conventions section now
