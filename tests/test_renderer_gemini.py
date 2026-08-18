@@ -24,6 +24,7 @@ from sibawayh.renderers.gemini import (
     DEFAULT_MODEL,
     DEFAULT_MODELS,
     MODEL_ENV,
+    GeminiClient,
     GeminiRenderer,
 )
 from sibawayh.renderers.template import line_for
@@ -316,19 +317,19 @@ def test_an_empty_sentence_asks_nothing() -> None:
 def test_the_key_and_model_come_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(API_KEY_ENV, "from-env")
     monkeypatch.setenv(MODEL_ENV, "gemini-something-else")
-    renderer = GeminiRenderer()
-    assert renderer.api_key == "from-env"
-    assert renderer.models == ("gemini-something-else",)
+    client = GeminiClient()
+    assert client.api_key == "from-env"
+    assert client.models == ("gemini-something-else",)
 
 
 def test_naming_a_model_pins_it(monkeypatch: pytest.MonkeyPatch) -> None:
     """Asking for one model means one model, not one and then the others."""
-    assert GeminiRenderer(api_key="k", model="gemini-3.5-flash").models == ("gemini-3.5-flash",)
+    assert GeminiClient(api_key="k", model="gemini-3.5-flash").models == ("gemini-3.5-flash",)
 
 
 def test_the_models_have_a_default(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv(MODEL_ENV, raising=False)
-    assert GeminiRenderer(api_key="k").models == DEFAULT_MODELS
+    assert GeminiClient(api_key="k").models == DEFAULT_MODELS
     assert DEFAULT_MODELS[0] == DEFAULT_MODEL
 
 

@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>سيبويه — إعراب</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Scheherazade+New:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Ink through leaf: the greens run from the darkest writing to the palest wash. */
+  --ink:#12291f;
+  --ink-soft:#274636;
+  --moss:#3d6b4f;
+  --sage:#7d9b81;
+  --wash:#cfdcc9;
+  --leaf:#e6ecdc;
+
+  --gold:#a8813f;
+  --gold-soft:#c9a86a;
+  --rubric:#8c3b2e;          /* the red of a chapter heading in a manuscript */
+
+  --parchment:#f3e9d2;
+  --parchment-deep:#e8dcc0;
+  --shadow:rgba(18,41,31,.18);
+
+  --serif:"Amiri","Scheherazade New","Traditional Arabic",serif;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--serif);
+  color:var(--ink);
+  background-color:#dfe5d4;
+  background-image:
+    /* the faint bloom of light on an open page */
+    radial-gradient(120% 80% at 50% -10%, rgba(255,252,240,.85), transparent 60%),
+    radial-gradient(90% 60% at 10% 110%, rgba(61,107,79,.16), transparent 60%),
+    radial-gradient(90% 60% at 90% 110%, rgba(61,107,79,.12), transparent 60%),
+    /* an arabesque, small and low-contrast, so it reads as texture and not as decoration */
+    url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'>\
+<g fill='none' stroke='%233d6b4f' stroke-opacity='.10' stroke-width='1'>\
+<path d='M60 6 C86 26 94 34 114 60 C94 86 86 94 60 114 C34 94 26 86 6 60 C26 34 34 26 60 6Z'/>\
+<circle cx='60' cy='60' r='19'/><circle cx='60' cy='60' r='33'/>\
+<path d='M60 27 L60 93 M27 60 L93 60'/>\
+</g></svg>");
+  background-attachment:fixed;
+  min-height:100vh;
+  padding:clamp(16px,4vw,48px) clamp(12px,4vw,32px) 64px;
+}
+
+/* ---------- the page itself, as a leaf of a manuscript ---------- */
+.leaf{
+  max-width:920px;margin:0 auto;position:relative;
+  background:
+    linear-gradient(180deg, var(--parchment), var(--parchment-deep));
+  border-radius:4px;
+  box-shadow:0 1px 0 rgba(255,255,255,.6) inset, 0 18px 48px -18px var(--shadow), 0 2px 8px var(--shadow);
+  padding:clamp(20px,4vw,44px);
+}
+/* the double rule a copyist draws before writing a word */
+.leaf::before,.leaf::after{content:"";position:absolute;pointer-events:none;border-radius:2px}
+.leaf::before{inset:10px;border:1.5px solid var(--gold);opacity:.55}
+.leaf::after{inset:16px;border:.5px solid var(--moss);opacity:.45}
+
+header{text-align:center;position:relative;padding-bottom:14px;margin-bottom:22px}
+h1{
+  margin:0;font-size:clamp(2.4rem,7vw,3.6rem);font-weight:700;
+  color:var(--ink);letter-spacing:.02em;line-height:1.1;
+}
+.rubric{color:var(--rubric);font-size:clamp(.95rem,2.4vw,1.1rem);margin-top:6px;letter-spacing:.04em}
+/* a knotwork divider, the sort ruled under a chapter title */
+.divider{display:block;margin:14px auto 0;width:min(320px,70%);height:16px;opacity:.85}
+
+/* ---------- asking ---------- */
+form{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:0 0 10px}
+input[type=text]{
+  flex:1 1 420px;min-width:0;
+  font-family:var(--serif);font-size:1.5rem;text-align:center;
+  padding:.55em .8em;color:var(--ink);
+  background:rgba(255,255,255,.55);
+  border:1.5px solid var(--sage);border-radius:3px;
+  transition:border-color .15s, box-shadow .15s, background .15s;
+}
+input[type=text]::placeholder{color:var(--sage)}
+input[type=text]:focus{
+  outline:none;border-color:var(--moss);background:rgba(255,255,255,.78);
+  box-shadow:0 0 0 3px rgba(125,155,129,.28);
+}
+button{
+  font-family:var(--serif);font-size:1.15rem;cursor:pointer;
+  padding:.5em 1.4em;color:var(--parchment);
+  background:linear-gradient(180deg,var(--moss),var(--ink-soft));
+  border:1px solid var(--ink);border-radius:3px;
+  box-shadow:0 1px 0 rgba(255,255,255,.25) inset;
+  transition:transform .1s, filter .15s;
+}
+button:hover{filter:brightness(1.09)}
+button:active{transform:translateY(1px)}
+button[disabled]{opacity:.55;cursor:progress}
+
+.options{display:flex;gap:18px;justify-content:center;align-items:center;font-size:.95rem;color:var(--ink-soft);margin-bottom:6px}
+.options label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.examples{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:8px}
+.examples button{
+  font-size:.95rem;padding:.25em .8em;color:var(--ink-soft);
+  background:rgba(255,255,255,.5);border:1px solid var(--wash);
+}
+
+.note{text-align:center;color:var(--ink-soft);font-size:1rem;min-height:1.4em;margin:6px 0 0}
+.note.bad{color:var(--rubric)}
+
+/* ---------- the tree ---------- */
+.diagram{margin-top:26px;overflow-x:auto;padding-bottom:4px;display:none}
+.diagram.open{display:block;animation:settle .3s ease-out}
+.locked{
+  margin-top:22px;text-align:center;color:var(--ink-soft);font-size:1rem;
+  padding:.9em 1em;border:1px dashed var(--sage);border-radius:3px;
+  background:rgba(255,255,255,.28);
+}
+.locked b{color:var(--moss);font-weight:700}
+.treehead{
+  text-align:center;color:var(--rubric);font-size:1.05rem;letter-spacing:.03em;
+  margin:22px 0 -8px;
+}
+.diagram svg{display:block;margin:0 auto}
+.arc{fill:none;stroke:var(--moss);stroke-width:1.6;opacity:.85}
+.arc.dim{stroke:var(--sage);stroke-dasharray:4 4;opacity:.75}
+.arc.lit{stroke:var(--rubric);stroke-width:2.4;opacity:1}
+.arclabel{font-family:var(--serif);font-size:14px;fill:var(--ink-soft);text-anchor:middle}
+.arclabel.lit{fill:var(--rubric);font-weight:700}
+.stem{stroke:var(--gold);stroke-width:2}
+
+/* ---------- the words ---------- */
+.line{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:4px}
+.word{
+  font-family:var(--serif);font-size:clamp(1.5rem,4.4vw,2.1rem);line-height:1.5;
+  padding:.12em .55em;cursor:pointer;color:var(--ink);
+  background:rgba(255,255,255,.42);
+  border:1px solid var(--wash);border-bottom:2.5px solid var(--moss);border-radius:3px;
+  transition:background .15s, transform .1s, border-color .15s;
+}
+.word:hover{background:rgba(255,255,255,.75);transform:translateY(-1px)}
+.word[aria-pressed=true]{background:#fff;border-color:var(--gold);border-bottom-color:var(--rubric)}
+.word.covert{border-style:dashed;border-bottom-style:dashed;color:var(--moss);background:transparent}
+.word.unsure{color:var(--sage);border-bottom-color:var(--sage);border-bottom-style:dotted}
+
+/* ---------- the panel ---------- */
+.panel{
+  margin-top:26px;padding:clamp(14px,3vw,22px);
+  background:rgba(255,255,255,.5);
+  border:1px solid var(--wash);border-inline-start:4px solid var(--gold);border-radius:3px;
+  display:none;
+}
+.panel.open{display:block;animation:settle .22s ease-out}
+@keyframes settle{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.panel h2{margin:0 0 2px;font-size:clamp(1.6rem,5vw,2.1rem);font-weight:700}
+.panel .role{color:var(--rubric);font-size:1.05rem;margin-bottom:14px}
+.rungs{list-style:none;margin:0;padding:0}
+.rungs li{
+  padding:.6em .9em;margin-bottom:8px;font-size:1.15rem;line-height:1.8;
+  background:rgba(255,255,255,.62);border-radius:3px;
+  border-inline-start:3px solid var(--sage);
+  animation:settle .2s ease-out;
+}
+.rungs li.answer{border-inline-start-color:var(--rubric);background:rgba(255,255,255,.85);font-size:1.2rem}
+.rungs .step{color:var(--moss);font-size:.85em;margin-inline-end:.5em}
+.panel .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+.panel .actions button{font-size:1rem;padding:.4em 1.1em}
+.panel .actions .quiet{
+  color:var(--ink-soft);background:rgba(255,255,255,.5);border:1px solid var(--wash);
+}
+.uncertain{color:var(--ink-soft);font-size:1.1rem;line-height:1.9}
+.guess{
+  margin-top:12px;padding:.7em .95em;border-radius:3px;
+  background:rgba(168,129,63,.10);
+  border:1px dashed var(--gold);border-inline-start:3px solid var(--gold);
+}
+.guess .tag{
+  display:inline-block;font-size:.8rem;letter-spacing:.05em;color:var(--gold);
+  border:1px solid var(--gold-soft);border-radius:2px;padding:.05em .5em;margin-bottom:.5em;
+}
+.guess p{margin:0;font-size:1.1rem;line-height:1.85}
+.guess .caution{margin-top:.6em;color:var(--rubric);font-size:.95rem}
+.word.done{border-bottom-color:var(--gold)}
+
+footer{text-align:center;margin-top:26px;color:var(--ink-soft);font-size:.9rem;opacity:.85}
+footer .src{color:var(--moss)}
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<main class="leaf">
+  <header>
+    <h1>سِيبَوَيْه</h1>
+    <div class="rubric">أَعْرِبْ جُمْلَتَكَ، واسْتَنْبِطْ إعرابَها بنفسِك</div>
+    <svg class="divider" viewBox="0 0 320 16" aria-hidden="true">
+      <g fill="none" stroke="#a8813f" stroke-width="1.2">
+        <path d="M8 8 H120 M200 8 H312"/>
+        <path d="M136 8 c8-7 16-7 24 0 c8 7 16 7 24 0 c-8-7-16-7-24 0 c-8 7-16 7-24 0Z"/>
+        <circle cx="128" cy="8" r="2.4"/><circle cx="192" cy="8" r="2.4"/>
+      </g>
+    </svg>
+  </header>
+
+  <form id="ask">
+    <input id="text" type="text" autocomplete="off" spellcheck="false"
+           placeholder="اكتب جملة عربية…" value="إن العراقيين قادرون">
+    <button id="go" type="submit">أَعْرِبْ</button>
+  </form>
+
+  <div class="examples" id="examples"></div>
+  <div class="options">
+    <label><input type="checkbox" id="llm" checked> شرحٌ مبسَّط</label>
+  </div>
+  <p class="note" id="note"></p>
+
+  <div class="line" id="line"></div>
+  <div class="treehead" id="treehead" style="display:none">شجرةُ الجملة</div>
+  <div class="diagram" id="diagram"></div>
+  <p class="locked" id="locked" style="display:none"></p>
+
+  <section class="panel" id="panel" aria-live="polite"></section>
+
+  <footer>اضغط على أي كلمة لتبدأ بالتلميحات <span class="src" id="src"></span></footer>
+</main>
+
+<script>
+const EXAMPLES = [
+  "إن العراقيين قادرون",
+  "كتاب الطالب جديد",
+  "العصفور في القفص",
+  "محمد يقرأ الكتاب",
+  "لم يقرأ محمد الكتاب",
+];
+
+const el = (id) => document.getElementById(id);
+const state = { words: [], selected: null, revealed: 0, seen: new Set() };
+/* `seen` holds the ids whose إعراب the student has actually reached. The tree is
+   the shape of the whole answer, so showing it early hands over every remaining
+   word at once — it is the reward for finishing, not the starting point. */
+
+/* ---------- asking ---------- */
+
+async function ask(text) {
+  el("go").disabled = true;
+  say("…يُقرأ ويُعرب");
+  clear();
+  try {
+    const response = await fetch("/analyze", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text, llm: el("llm").checked }),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.detail || "تعذّر الإعراب");
+    }
+    const analysis = await response.json();
+    state.words = analysis.words;
+    say("");
+    el("src").textContent = analysis.source === "gemini" ? "· شرحٌ مولَّد" : "· شرحٌ من القواعد";
+    drawWords();
+    drawTree();
+  } catch (problem) {
+    say(problem.message, true);
+  } finally {
+    el("go").disabled = false;
+  }
+}
+
+function say(message, bad = false) {
+  const note = el("note");
+  note.textContent = message;
+  note.classList.toggle("bad", bad);
+}
+
+function clear() {
+  state.words = []; state.selected = null; state.revealed = 0; state.seen = new Set();
+  el("line").innerHTML = ""; el("diagram").innerHTML = "";
+  el("panel").className = "panel"; el("src").textContent = "";
+  el("diagram").className = "diagram";
+  el("treehead").style.display = "none";
+  el("locked").style.display = "none";
+}
+
+/* ---------- the words ---------- */
+
+function drawWords() {
+  const line = el("line");
+  line.innerHTML = "";
+  for (const word of state.words) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "word"
+      + (word.inserted ? " covert" : "")
+      + (word.certain ? "" : " unsure")
+      + (state.seen.has(word.id) ? " done" : "");
+    button.textContent = word.diac;
+    button.setAttribute("aria-pressed", "false");
+    button.dataset.id = word.id;
+    button.title = word.inserted ? "ضمير مستتر — ليس في الجملة" : (word.role || "لم يتضح إعرابها");
+    button.addEventListener("click", () => select(word.id));
+    line.appendChild(button);
+  }
+}
+
+function select(id) {
+  state.selected = id;
+  state.revealed = 1;
+  for (const button of document.querySelectorAll(".word")) {
+    button.setAttribute("aria-pressed", String(Number(button.dataset.id) === id));
+  }
+  drawPanel();
+  drawTree();
+}
+
+/* A word counts as reached once its answer has been shown. Words the rules
+   declined count too: there is no answer to work towards, so nothing is being
+   skipped past. */
+function reached(word) {
+  state.seen.add(word.id);
+  const button = document.querySelector(`.word[data-id="${word.id}"]`);
+  if (button) button.classList.add("done");
+  drawTree();
+}
+
+function allReached() {
+  return state.words.length > 0 && state.words.every((word) => state.seen.has(word.id));
+}
+
+/* ---------- the hint panel ---------- */
+
+function drawPanel() {
+  const panel = el("panel");
+  const word = state.words.find((candidate) => candidate.id === state.selected);
+  if (!word) { panel.className = "panel"; return; }
+  panel.className = "panel open";
+
+  if (!word.hints.length) {
+    panel.innerHTML =
+      `<h2>${word.diac}</h2>`
+      + `<p class="uncertain">لم يتضح إعراب هذه الكلمة بقواعدنا، فلا نجزم بها.</p>`
+      + (word.suggestion ? guess(word.suggestion) : "");
+    reached(word);
+    return;
+  }
+
+  const shown = word.hints.slice(0, state.revealed);
+  const last = state.revealed >= word.hints.length;
+  panel.innerHTML =
+    `<h2>${word.diac}</h2>`
+    + `<div class="role">${last && word.role ? word.role : "&nbsp;"}</div>`
+    + `<ul class="rungs">`
+    + shown.map((hint, index) =>
+        `<li class="${index === word.hints.length - 1 ? "answer" : ""}">`
+        + `<span class="step">${index + 1}</span>${hint}</li>`).join("")
+    + `</ul>`
+    + `<div class="actions">`
+    + (last ? "" : `<button type="button" id="more">تلميح آخر</button>`)
+    + `<button type="button" class="quiet" id="all">${last ? "إخفاء" : "أظهر الإعراب"}</button>`
+    + `</div>`;
+
+  if (last) reached(word);
+
+  const more = el("more");
+  if (more) more.addEventListener("click", () => { state.revealed += 1; drawPanel(); });
+  el("all").addEventListener("click", () => {
+    state.revealed = last ? 1 : word.hints.length;
+    drawPanel();
+  });
+}
+
+/* A suggestion is the model's, not the rules'. It is drawn as a different kind of
+   thing from an answer, and it says so. */
+function guess(text) {
+  return `<div class="guess">`
+    + `<span class="tag">اقتراح، لا إعراب مؤكَّد</span>`
+    + `<p>${text}</p>`
+    + `<p class="caution">هذا اقتراحٌ من المساعد الذكي ولم تُثبته قواعدنا.`
+    + ` الأفضل أن تعرضه على مدرّسك قبل أن تعتمده.</p>`
+    + `</div>`;
+}
+
+/* ---------- the arc diagram ---------- */
+
+const ARC_HEIGHT = 26;   // per unit of distance between two words
+const MAX_ARC = 132;
+const TOP = 12;
+
+function drawTree() {
+  const diagram = el("diagram");
+  const locked = el("locked");
+  const heading = el("treehead");
+  diagram.innerHTML = "";
+  if (!state.words.length) { locked.style.display = "none"; heading.style.display = "none"; return; }
+
+  if (!allReached()) {
+    const left = state.words.filter((word) => !state.seen.has(word.id)).length;
+    diagram.className = "diagram";
+    heading.style.display = "none";
+    locked.style.display = "block";
+    locked.innerHTML = `تظهر شجرةُ الجملة بعد إعراب كلماتها كلِّها. بقيت <b>${left}</b> `
+      + (left === 1 ? "كلمة" : "كلمات");
+    return;
+  }
+  locked.style.display = "none";
+  heading.style.display = "block";
+  diagram.className = "diagram open";
+
+  const buttons = [...document.querySelectorAll(".word")];
+  if (!buttons.length) return;
+  const frame = diagram.getBoundingClientRect();
+  const centres = new Map();
+  for (const button of buttons) {
+    const box = button.getBoundingClientRect();
+    centres.set(Number(button.dataset.id), box.left - frame.left + box.width / 2);
+  }
+
+  const depth = new Map();
+  const depthOf = (word, seen = 0) => {
+    if (depth.has(word.id)) return depth.get(word.id);
+    const parent = state.words.find((candidate) => candidate.id === word.head);
+    const value = (!parent || seen > 40) ? 0 : depthOf(parent, seen + 1) + 1;
+    depth.set(word.id, value);
+    return value;
+  };
+
+  let tallest = 0;
+  const arcs = [];
+  for (const word of state.words) {
+    if (!word.head) continue;
+    const from = centres.get(word.id), to = centres.get(word.head);
+    if (from === undefined || to === undefined) continue;
+    const span = Math.abs(from - to);
+    const height = Math.min(MAX_ARC, ARC_HEIGHT + span * 0.34 + depthOf(word) * 6);
+    tallest = Math.max(tallest, height);
+    arcs.push({ word, from, to, height });
+  }
+
+  const width = Math.max(frame.width, 1);
+  const svgHeight = tallest + TOP + 22;
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("width", width);
+  svg.setAttribute("height", svgHeight);
+  svg.setAttribute("viewBox", `0 0 ${width} ${svgHeight}`);
+
+  const add = (name, attributes, text) => {
+    const node = document.createElementNS("http://www.w3.org/2000/svg", name);
+    for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, value);
+    if (text !== undefined) node.textContent = text;
+    svg.appendChild(node);
+    return node;
+  };
+
+  // the root gets a stem rather than an arc: nothing governs it
+  const root = state.words.find((word) => word.head === 0);
+  if (root && centres.has(root.id)) {
+    const x = centres.get(root.id);
+    add("path", { d: `M${x} ${svgHeight} V${svgHeight - 26}`, class: "stem" });
+  }
+
+  for (const arc of arcs) {
+    const base = svgHeight;
+    const apex = base - arc.height;
+    const lit = arc.word.id === state.selected || arc.word.head === state.selected;
+    add("path", {
+      d: `M${arc.from} ${base} C${arc.from} ${apex}, ${arc.to} ${apex}, ${arc.to} ${base}`,
+      class: "arc" + (lit ? " lit" : (arc.word.certain ? "" : " dim")),
+    });
+    if (arc.word.role) {
+      const middle = (arc.from + arc.to) / 2;
+      add("text", {
+        x: middle,
+        y: base - arc.height * 0.78 - 4,
+        class: "arclabel" + (lit ? " lit" : ""),
+      }, arc.word.role);
+    }
+  }
+
+  diagram.appendChild(svg);
+}
+
+/* ---------- wiring ---------- */
+
+el("ask").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const text = el("text").value.trim();
+  if (text) ask(text);
+});
+
+el("llm").addEventListener("change", () => {
+  const text = el("text").value.trim();
+  if (text && state.words.length) ask(text);
+});
+
+for (const example of EXAMPLES) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = example;
+  button.addEventListener("click", () => { el("text").value = example; ask(example); });
+  el("examples").appendChild(button);
+}
+
+window.addEventListener("resize", () => { if (state.words.length) drawTree(); });
+document.fonts?.ready.then(() => { if (state.words.length) drawTree(); });
+</script>
+</body>
+</html>

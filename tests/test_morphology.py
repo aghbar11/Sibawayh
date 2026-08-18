@@ -317,14 +317,39 @@ def test_joined_pronoun_carries_its_role_and_features() -> None:
 
 
 @pytest.mark.parametrize("sentence_id", sorted(RECORDED), ids=sorted(RECORDED))
-def test_form_is_bare_and_diac_is_vowelled(sentence_id: str) -> None:
-    """`form` is the word as typed, `diac` is CAMeL's vowelling of it. Stripping
-    the marks off `diac` must land exactly on `form`, or the two have drifted
-    apart and the student is shown a word nobody wrote."""
+def test_form_is_bare(sentence_id: str) -> None:
+    """`form` is the word as typed and `diac` is CAMeL's vowelling of it, so the
+    marks live in one of the two fields and never in both."""
     for token in build(sentence_id).tokens:
         assert token.form == strip_diacritics(token.form)
-        if token.diac is not None:
-            assert strip_diacritics(token.diac) == token.form
+
+
+@pytest.mark.parametrize("sentence_id", sorted(RECORDED), ids=sorted(RECORDED))
+def test_form_is_the_word_that_was_typed(sentence_id: str) -> None:
+    """Not the analyzer's spelling of it.
+
+    CAMeL's chosen reading of إن is أَنَّ, and taking `form` from the analysis
+    showed the student a different word than the one they wrote — on a page,
+    their own sentence rewritten in front of them. The reading still travels in
+    `diac`, which is where a claim about vowelling belongs.
+
+    Only checked where the word became one token. A clitic split makes the stem a
+    part of the word, and the analysis is then the only thing that knows where
+    that part begins.
+    """
+    record = RECORDED[sentence_id]
+    tokens = build(sentence_id).tokens
+    if len(tokens) != len(record["words"]):
+        pytest.skip("a word was split into clitics")
+    for token, word in zip(tokens, record["words"], strict=True):
+        assert token.form == strip_diacritics(word["word"])
+
+
+def test_the_analyzer_may_disagree_with_the_spelling_and_the_student_still_sees_theirs() -> None:
+    """The case that found this: إن analyzed as أَنَّ."""
+    inna = build("nasikh_inna_01").tokens[0]
+    assert inna.form == "إن"
+    assert strip_diacritics(str(inna.diac)) == "أن"
 
 
 def test_backoff_analysis_leaves_diac_empty() -> None:

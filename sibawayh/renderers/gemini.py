@@ -147,12 +147,11 @@ def _text_of(envelope: dict[str, Any]) -> str:
         raise GeminiError(f"unexpected reply shape: {shape}") from shape
 
 
-def _lines_by_id(text: str) -> dict[int, str]:
+def _lines_by_id(parsed: Any) -> dict[int, str]:
     try:
-        parsed = json.loads(text)
         return {int(line["id"]): str(line["text"]) for line in parsed["lines"]}
-    except (json.JSONDecodeError, KeyError, TypeError, ValueError) as bad:
-        raise GeminiError(f"could not read the reply as JSON: {bad}") from bad
+    except (KeyError, TypeError, ValueError) as bad:
+        raise GeminiError(f"could not read the reply: {bad}") from bad
 
 
 def _complaint(tokens: Sequence[Token], lines: dict[int, str]) -> str | None:
@@ -175,15 +174,16 @@ def _complaint(tokens: Sequence[Token], lines: dict[int, str]) -> str | None:
     return "أعد المحاولة. في إجابتك السابقة:\n" + "\n".join(problems)
 
 
-class GeminiRenderer(Renderer):
-    """Rewrites the template's lines as teaching prose, and never as analysis.
+class GeminiClient:
+    """One POST to Gemini, with the retrying and the reading-of-envelopes.
 
-    `deterministic` is False, which is the honest value and has consequences:
-    nothing caches this and no test asserts a fixed string against it.
+    Split out from the renderer because a second caller arrived: suggesting an
+    إعراب for a word the rules declined is a different task with a different
+    prompt, and it has no business reimplementing quota handling to get one.
+
+    Knows nothing about إعراب. It takes an instruction, a prompt and a schema,
+    and returns whatever JSON came back.
     """
-
-    name = "gemini"
-    deterministic = False
 
     def __init__(
         self,
@@ -234,16 +234,17 @@ class GeminiRenderer(Renderer):
                 delay *= 2
         raise GeminiError(f"could not reach the model: {failure}") from failure
 
-    def _ask(self, prompt: str) -> dict[int, str]:
+    def ask(self, instruction: str, prompt: str, schema: dict[str, Any]) -> Any:
+        """Send one request and return the parsed JSON the model produced."""
         if not self.api_key:
             raise GeminiError(f"no API key; set ${API_KEY_ENV}")
         body = json.dumps(
             {
-                "systemInstruction": {"parts": [{"text": INSTRUCTION}]},
+                "systemInstruction": {"parts": [{"text": instruction}]},
                 "contents": [{"role": "user", "parts": [{"text": prompt}]}],
                 "generationConfig": {
                     "responseMimeType": "application/json",
-                    "responseSchema": RESPONSE_SCHEMA,
+                    "responseSchema": schema,
                 },
             },
             ensure_ascii=False,
@@ -254,7 +255,27 @@ class GeminiRenderer(Renderer):
             envelope = json.loads(raw.decode("utf-8"))
         except (json.JSONDecodeError, UnicodeDecodeError) as bad:
             raise GeminiError(f"could not read the response: {bad}") from bad
-        return _lines_by_id(_text_of(envelope))
+        try:
+            return json.loads(_text_of(envelope))
+        except json.JSONDecodeError as bad:
+            raise GeminiError(f"could not read the reply as JSON: {bad}") from bad
+
+
+class GeminiRenderer(Renderer):
+    """Rewrites the template's lines as teaching prose, and never as analysis.
+
+    `deterministic` is False, which is the honest value and has consequences:
+    nothing caches this and no test asserts a fixed string against it.
+    """
+
+    name = "gemini"
+    deterministic = False
+
+    def __init__(self, client: GeminiClient | None = None, **settings: Any) -> None:
+        self.client = client or GeminiClient(**settings)
+
+    def _ask(self, prompt: str) -> dict[int, str]:
+        return _lines_by_id(self.client.ask(INSTRUCTION, prompt, RESPONSE_SCHEMA))
 
     def render(self, tokens: Sequence[Token]) -> Rendering:
         """One line per token: the model's where it kept the facts, ours where it

@@ -242,3 +242,83 @@ def test_a_pasted_page_is_refused(client: TestClient) -> None:
     """Long enough to tie up the parser, and longer than any sentence a student
     types."""
     assert client.post("/analyze", json={"text": "و" * 5000}).status_code == 422
+
+
+# --- the page -----------------------------------------------------------------------
+
+
+def test_the_page_is_served_at_the_root(client: TestClient) -> None:
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+
+
+def test_the_page_needs_no_build_step() -> None:
+    """One file, so a demo is `serve` and a browser. A build step is a thing to
+    forget on the day it matters."""
+    page = api.PAGE.read_text(encoding="utf-8")
+    assert page.count("<script") == 1
+    assert "src=" not in page.split("<script")[1][:200]
+    assert 'dir="rtl"' in page
+
+
+# --- suggestions --------------------------------------------------------------------
+
+
+def test_a_suggestion_is_never_a_role(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The containment this whole feature rests on. A guess arrives in its own
+    field, so nothing downstream can mistake it for a derived role."""
+    silent = GOLD[INNA].model_copy(
+        update={
+            "tokens": [
+                token.model_copy(update={"irab_role": None}) if token.id == 2 else token
+                for token in GOLD[INNA].tokens
+            ]
+        }
+    )
+    monkeypatch.setattr(api.pipeline, "analyze", lambda text, normalize_input=True: silent)
+    monkeypatch.setattr(api, "suggest", lambda tokens: {2: "أظنها اسم إنّ منصوبًا"})
+    api.forget()
+
+    word = analyze(client, INNA, llm=True)["words"][1]
+    assert word["role"] is None
+    assert word["certain"] is False
+    assert word["suggestion"] == "أظنها اسم إنّ منصوبًا"
+
+
+def test_a_word_the_rules_answered_never_carries_a_suggestion(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Even if the model volunteers one. A guess beside an answer is a guess
+    wearing an answer's clothes."""
+    monkeypatch.setattr(api, "suggest", lambda tokens: {1: "اقتراح لا محل له"})
+    api.forget()
+    assert all(word["suggestion"] is None for word in analyze(client, INNA, llm=True)["words"])
+
+
+def test_nothing_is_suggested_when_nothing_was_declined(
+    client: TestClient, gold: GoldPipeline, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An ordinary sentence costs one request, not two."""
+    asked = []
+    monkeypatch.setattr(api, "suggest", lambda tokens: asked.append(tokens) or {})
+    api.forget()
+    analyze(client, INNA, llm=True)
+    assert not asked
+
+
+def test_the_page_marks_a_suggestion_as_one() -> None:
+    """`suggest.py` cannot enforce this from where it sits, so it is checked
+    here: the page must say the guess is a guess and say to ask a teacher."""
+    page = api.PAGE.read_text(encoding="utf-8")
+    assert "suggestion" in page
+    assert "اقتراح" in page
+    assert "مدرّسك" in page
+
+
+def test_the_page_hides_the_tree_until_the_sentence_is_finished() -> None:
+    """The tree is the shape of the whole answer, so showing it early hands over
+    every remaining word at once."""
+    page = api.PAGE.read_text(encoding="utf-8")
+    assert "allReached" in page
+    assert ".diagram{" in page and "display:none" in page

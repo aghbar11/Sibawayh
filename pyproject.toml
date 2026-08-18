@@ -32,6 +32,9 @@ dev = [
 [tool.hatch.build.targets.wheel]
 packages = ["sibawayh"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"sibawayh/web" = "sibawayh/web"
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"

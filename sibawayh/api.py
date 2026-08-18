@@ -19,6 +19,12 @@ same thirteen sentences pays for each of them once.
 **Failure is never an error page.** A model that is down or out of quota falls
 back to the template line inside the renderer, and the request succeeds. The only
 4xx here is an empty sentence.
+
+**A suggestion is not a role.** Where the rules declined, the model may offer a
+guess, and it arrives in `Word.suggestion` — never in `Word.role`. The two are
+different fields so that nothing can confuse them, and the page is required to
+draw them differently: a role is an answer, and a suggestion is something to take
+to a teacher.
 """
 
 from __future__ import annotations
@@ -27,14 +33,17 @@ import os
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from functools import lru_cache
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from sibawayh import __version__
 from sibawayh.hints import ladder
 from sibawayh.pipeline import Pipeline
 from sibawayh.renderers import Renderer, describe
+from sibawayh.renderers.suggest import suggest, unclear
 from sibawayh.renderers.template import TemplateRenderer
 from sibawayh.schema import Sentence, Token
 
@@ -43,6 +52,10 @@ MAX_LENGTH = 500
 whole page cannot tie up the parser."""
 
 CACHE_SIZE = 256
+
+PAGE = Path(__file__).parent / "web" / "index.html"
+"""The whole front end. One file, no build step, and nothing to install — the
+only thing it fetches is a font."""
 
 pipeline = Pipeline()
 """The one pipeline the server holds. Warmed at startup."""
@@ -74,6 +87,12 @@ class Word(BaseModel):
     """False where the rules abstained. The page greys these rather than hiding
     them: the word was reached and not analyzed, which is a different thing from
     being skipped."""
+    suggestion: str | None = None
+    """A model's guess, offered only where the rules declined and never anywhere
+    else. Its own field on purpose: nothing downstream can mistake it for a
+    derived role, because it is not the same field. The page must show it as a
+    guess and say to check with a teacher — that obligation cannot be enforced
+    from here, so it is tested instead."""
 
 
 class Analysis(BaseModel):
@@ -110,7 +129,12 @@ def _renderer(llm: bool) -> Renderer:
     return GeminiRenderer()
 
 
-def _words(tokens: Sequence[Token], lines: Sequence[str | None]) -> list[Word]:
+def _words(
+    tokens: Sequence[Token],
+    lines: Sequence[str | None],
+    suggestions: dict[int, str] | None = None,
+) -> list[Word]:
+    offered = suggestions or {}
     drawn = []
     for token, line in zip(tokens, lines, strict=True):
         rungs = ladder(token)
@@ -126,6 +150,7 @@ def _words(tokens: Sequence[Token], lines: Sequence[str | None]) -> list[Word]:
                 hints=[rung.text for rung in rungs.rungs] if rungs else [],
                 inserted=token.inserted,
                 certain=token.irab_role is not None,
+                suggestion=offered.get(token.id) if token.irab_role is None else None,
             )
         )
     return drawn
@@ -136,7 +161,11 @@ def analyze(text: str, llm: bool = True) -> Analysis:
     sentence: Sentence = pipeline.analyze(text)
     renderer = _renderer(llm)
     rendering = describe(sentence.tokens, renderer)
-    words = _words(sentence.tokens, rendering.lines)
+
+    # Asked only when there is something to ask about, so an ordinary sentence
+    # costs one request and not two.
+    suggestions = suggest(sentence.tokens) if llm and unclear(sentence.tokens) else {}
+    words = _words(sentence.tokens, rendering.lines, suggestions)
 
     # A renderer that fell back produced the template's lines, and saying
     # "gemini" then would credit prose the model never wrote.
@@ -169,6 +198,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Sibawayh", version=__version__, lifespan=lifespan)
+
+
+@app.get("/", include_in_schema=False)
+def page() -> FileResponse:
+    return FileResponse(PAGE, media_type="text/html")
 
 
 @app.get("/health")

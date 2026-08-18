@@ -97,6 +97,12 @@ Newest last.
 | 15 | a fourth check: the model's reason must come from the rule's own evidence |
 | 16 | feature restatements get no entry; a hint made of `case=nom` gives the answer away |
 | 16 | `python -m sibawayh irab --hints N` shows the first N rungs instead of the answer |
+| 17 | `pipeline.py` — the chain in one place; the CLI stopped spelling it out |
+| 17 | `api.py` + `web/index.html` — one JSON endpoint and one page, no build step |
+| 17 | **the model may now suggest a role, but only where the rules declined** |
+| 17 | a suggestion lives in its own field and never in `irab_role` |
+| 17 | the tree is hidden until every word has been reached |
+| 5 | `form` comes from the input again, not from the chosen analysis — إن stays إن |
 
 **Why the inventory is 25 and not 34.** The plan says every label must be in the 34-label set of
 the I3rab paper. Nine of those have no rule producing them — حال، تمييز، بدل، توكيد، عطف، مفعول
@@ -353,6 +359,56 @@ correct and a little stiff, and `--hints` ignores `--llm` entirely. The model sh
 rungs, but the ladder must keep deciding *what* each rung may contain — a model asked to hint at
 اسم إنّ will give the answer on the first rung, because being helpful is its default. That needs the
 inverse of the check above: rungs one and two must **not** contain the role or the case.
+
+**The one place the model is allowed to decide something.** CLAUDE.md says the LLM renders and does
+not decide, and everything until now enforced that with types: a renderer can return nothing but
+strings. `renderers/suggest.py` is an exception, made deliberately and on request.
+
+The reason is what a student sees when the rules abstain: their word, and nothing beside it. That is
+honest and it is also the least useful thing the page can do, since the word they are stuck on is
+precisely the one we declined. A guess that is labelled a guess, with a note to check it with a
+teacher, is more use than silence and is not the failure mode abstention exists to prevent — that
+failure mode is a *confident* wrong answer.
+
+The containment is structural rather than promised:
+
+* A suggestion never becomes `irab_role`. It comes back in its own map and lives in its own field,
+  `Word.suggestion`, so nothing downstream can confuse the two.
+* Only tokens the rules declined are asked about, and a suggestion that lands on any other token is
+  dropped — a model asked about one word will sometimes answer about another.
+* Nothing is scored with it. Evaluation reads `irab_role`, which this cannot reach.
+* The page must draw it differently. That is the one part `suggest.py` cannot enforce from where it
+  sits, so it is asserted in the API tests instead.
+
+Measured: محمد in لم يقرأ محمد الكتاب comes back as *فاعل مرفوع وعلامة رفعه الضمة الظاهرة على آخره
+لأنه من قام بالفعل*, which is right, and which our rules still decline to say.
+
+**The tree is the reward for finishing, not the starting point.** It is the shape of the whole
+answer, so a student who sees it early has been handed every remaining word at once. It stays hidden
+until each word has been reached, with a count of how many are left. A word the rules declined
+counts as reached — there is no answer to work towards, so nothing is being skipped past.
+
+**`form` comes from the input again.** It was built from CAMeL's chosen analysis, so a student who
+typed إن was shown أن — their own sentence rewritten in front of them, which was cosmetic in a
+terminal and is not on a page. The reading still travels in `diac`, which is where a claim about
+vowelling belongs. Where a word was split into clitics the analysis is still the source, because
+the stem is then a part of the word and only the analysis knows where that part begins.
+
+The test that had asserted the old behaviour asserted it for a good reason — that the two fields
+must not drift apart — and the reason was inverted: the drift was the analyzer disagreeing with the
+student, and showing the analyzer's spelling was the bug rather than the safeguard.
+
+**Why محمد still abstains, even fully vowelled.** Measured: CAMeL returns two readings of محمد,
+`مُحَمَّد` and a bare backoff, and *neither carries a case*. Typed diacritics choose among the
+readings CAMeL offers; they cannot add a feature to a reading. So a student typing مُحَمَّدٌ changes
+nothing, `VERBAL_AGENT` still sees `case=unknown`, and the rule declines. Closing this means reading
+the case off the typed ending rather than picking a reading — deriving a feature instead of
+selecting one — which is a different capability and would need a provenance value that is neither
+`camel` nor `rules`. Not built.
+
+**`GeminiClient` was split out of `GeminiRenderer`** when the second caller arrived. Suggesting a
+role is a different task with a different prompt, and it has no business reimplementing quota
+handling to get one.
 
 Two edits were made directly to `CLAUDE.md`, both requested: the `prc0` bullet now records that
 `d3tok` splits ال and that folding it back is the rule, and the conventions section now

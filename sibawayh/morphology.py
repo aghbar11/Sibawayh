@@ -439,6 +439,25 @@ def _segment(word: str, top: Mapping[str, Any]) -> tuple[list[Clitic], str, list
     return proclitics, stem, enclitics
 
 
+def _surface(
+    word: str,
+    typed: str | None,
+    stem_diac: str,
+    proclitics: Sequence[Clitic],
+    enclitics: Sequence[Clitic],
+) -> str:
+    """What to show as the stem's `form`.
+
+    The student's own spelling wherever it is the whole word, since that is what
+    `form` promises and what they will look for on the page. Where clitics were
+    split off, the stem is a part of the word rather than the word, and only the
+    analysis knows where that part starts.
+    """
+    if proclitics or enclitics:
+        return strip_diacritics(stem_diac) or word
+    return strip_diacritics(typed) if typed else word
+
+
 def tokens_from_word(
     word: str,
     analyses: Sequence[tuple[Mapping[str, Any], float | None]],
@@ -478,7 +497,17 @@ def tokens_from_word(
         # `form` is the word as typed, `diac` is CAMeL's diacritization of it. On a
         # backoff analysis there is no diacritization, and `diac` stays empty rather
         # than echoing the surface back as though it had been vowelled.
-        form=strip_diacritics(stem_diac) or word,
+        #
+        # Taken from the input and not from the analysis. CAMeL's chosen reading of
+        # إن is أَنَّ, and deriving the form from it showed the student a different
+        # word than the one they typed — on a page, their own sentence rewritten in
+        # front of them. `diac` still carries the reading, which is where a claim
+        # about vowelling belongs.
+        #
+        # Only where the word was not segmented. A clitic split makes the stem a
+        # *part* of the word, and the analysis is then the only thing that knows
+        # where the part begins.
+        form=_surface(word, typed, stem_diac, proclitics, enclitics),
         diac=stem_diac or None,
         lemma=top.get("lex"),
         root=top.get("root"),
