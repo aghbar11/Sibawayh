@@ -23,14 +23,10 @@ import unicodedata
 from collections.abc import Sequence
 
 from sibawayh import __version__
-from sibawayh.arcs import normalize_arcs
-from sibawayh.covert import insert_covert_pronouns
 from sibawayh.hints import ladder
 from sibawayh.renderers import Renderer, describe
 from sibawayh.renderers.template import TemplateRenderer
-from sibawayh.rules import apply_rules
 from sibawayh.schema import Sentence, Token
-from sibawayh.validate import enforce
 
 FEATURE_ORDER = ("aspect", "mood", "voice", "case", "state", "person", "gen", "num")
 """Feature display order: verbal categories, then case and state, then agreement."""
@@ -215,6 +211,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="show the first N hints for each word instead of the answer (1-3)",
     )
     irab.add_argument("--json", action="store_true", help="print the Sentence as JSON")
+
+    serve = subcommands.add_parser("serve", help="run the API the browser talks to")
+    serve.add_argument("--host", default="127.0.0.1")
+    serve.add_argument("--port", type=int, default=8000)
+    serve.add_argument(
+        "--reload",
+        action="store_true",
+        help="restart on a code change; loads the models again each time",
+    )
     return parser
 
 
@@ -239,20 +244,9 @@ def _irab(args: argparse.Namespace) -> int:
         print("nothing to analyze", flush=True)
         return 2
 
-    from sibawayh.morphology import CamelMorphology
-    from sibawayh.parsers import attach
-    from sibawayh.parsers.catib import CatibParser
+    from sibawayh.pipeline import Pipeline
 
-    parser = CatibParser()
-    sentence = CamelMorphology().analyze(args.text, normalize_input=not args.raw)
-    tokens = enforce(
-        apply_rules(
-            insert_covert_pronouns(
-                normalize_arcs(attach(sentence.tokens, parser), parser.formalism)
-            )
-        )
-    )
-    analyzed = sentence.model_copy(update={"tokens": tokens})
+    analyzed = Pipeline().analyze(args.text, normalize_input=not args.raw)
 
     if args.json:
         print(analyzed.model_dump_json(indent=2))
@@ -268,10 +262,26 @@ def _irab(args: argparse.Namespace) -> int:
     return 0
 
 
+def _serve(args: argparse.Namespace) -> int:
+    """Run the server. Models load at startup, so the first sentence costs what
+    every other sentence costs."""
+    import uvicorn
+
+    uvicorn.run(
+        "sibawayh.api:app",
+        host=args.host,
+        port=args.port,
+        reload=args.reload,
+    )
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "analyze":
         return _analyze(args)
     if args.command == "irab":
         return _irab(args)
+    if args.command == "serve":
+        return _serve(args)
     raise AssertionError(f"unhandled command {args.command!r}")  # pragma: no cover

@@ -25,6 +25,8 @@ api = ["fastapi>=0.110", "uvicorn>=0.29"]
 dev = [
     "pytest>=8.0",
     "ruff>=0.4",
+    # `fastapi.testclient` needs it; the API tests never open a socket.
+    "httpx>=0.27",
 ]
 
 [tool.hatch.build.targets.wheel]

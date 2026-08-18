@@ -12,6 +12,8 @@ MODULES = [
     "sibawayh.arcs",
     "sibawayh.config",
     "sibawayh.covert",
+    "sibawayh.hints",
+    "sibawayh.pipeline",
     "sibawayh.morphology",
     "sibawayh.normalize",
     "sibawayh.parsers",
