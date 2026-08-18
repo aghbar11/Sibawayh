@@ -9,16 +9,28 @@ from typing import Any
 
 import pytest
 from sibawayh.cli import (
+    UNCERTAIN,
     build_parser,
     display_width,
     format_alternatives,
     format_features,
+    format_irab,
     format_sentence,
     format_table,
     main,
 )
 from sibawayh.morphology import sentence_from_analyses
-from sibawayh.schema import Analysis, Case, Features, Pos, Sentence, State, Token
+from sibawayh.schema import (
+    Analysis,
+    Case,
+    Features,
+    Gender,
+    Number,
+    Pos,
+    Sentence,
+    State,
+    Token,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RECORDED = json.loads(
@@ -205,3 +217,40 @@ def test_json_output_round_trips(capsys) -> None:
     sentence = Sentence.model_validate_json(capsys.readouterr().out)
     assert len(sentence.tokens) == 3
     assert sentence.tokens[0].feats.state == State.CONSTRUCT
+
+
+def test_format_irab_puts_the_word_in_front_of_its_analysis() -> None:
+    """The renderer returns the analysis alone; pairing it with the word is the
+    caller's job, and the CLI is the caller."""
+    sentence = Sentence(
+        sentence="الكتاب مفيد",
+        tokens=[
+            Token(
+                id=1,
+                form="الكتاب",
+                diac="الكِتابُ",
+                pos=Pos.NOUN,
+                irab_role="مبتدأ",
+                feats=Features(case=Case.NOM, num=Number.S, gen=Gender.M),
+            ),
+            Token(id=2, form="مفيد", diac="مُفيدٌ", pos=Pos.ADJ),
+        ],
+    )
+    lines = format_irab(sentence).splitlines()
+    assert lines[0].startswith("الكِتابُ")
+    assert "مبتدأ مرفوع" in lines[0]
+
+
+def test_format_irab_marks_a_token_the_rules_declined() -> None:
+    """Not the same as skipping it. The student sees the word was reached."""
+    sentence = Sentence(
+        sentence="مفيد",
+        tokens=[Token(id=1, form="مفيد", diac="مُفيدٌ", pos=Pos.ADJ)],
+    )
+    assert UNCERTAIN in format_irab(sentence)
+
+
+def test_the_irab_subcommand_exists() -> None:
+    args = build_parser().parse_args(["irab", "الكتاب مفيد"])
+    assert args.command == "irab"
+    assert args.text == "الكتاب مفيد"

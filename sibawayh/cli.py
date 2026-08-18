@@ -23,7 +23,13 @@ import unicodedata
 from collections.abc import Sequence
 
 from sibawayh import __version__
+from sibawayh.arcs import normalize_arcs
+from sibawayh.covert import insert_covert_pronouns
+from sibawayh.renderers import describe
+from sibawayh.renderers.template import TemplateRenderer
+from sibawayh.rules import apply_rules
 from sibawayh.schema import Sentence, Token
+from sibawayh.validate import enforce
 
 FEATURE_ORDER = ("aspect", "mood", "voice", "case", "state", "person", "gen", "num")
 """Feature display order: verbal categories, then case and state, then agreement."""
@@ -110,10 +116,30 @@ def format_sentence(sentence: Sentence, alternatives: int = 0) -> str:
     return "\n".join(parts)
 
 
+UNCERTAIN = "— لم تتضح"
+"""Shown where the rules abstained. The student sees that the word was reached
+and not analyzed, which is a different thing from the word being skipped."""
+
+
+def format_irab(sentence: Sentence) -> str:
+    """The إعراب of every token, one line each, word first.
+
+    The renderer returns the analysis alone; putting the word in front of it is
+    the caller's job, and this is the caller.
+    """
+    rendering = describe(sentence.tokens, TemplateRenderer())
+    words = [token.diac or token.form for token in sentence.tokens]
+    width = max((display_width(word) for word in words), default=0)
+    return "\n".join(
+        f"{_pad(word, width)}  {line or UNCERTAIN}"
+        for word, line in zip(words, rendering.lines, strict=True)
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="sibawayh",
-        description="Arabic morphological analysis. Syntax and إعراب are not wired up yet.",
+        description="Arabic morphological analysis and إعراب.",
     )
     parser.add_argument("--version", action="version", version=f"sibawayh {__version__}")
     subcommands = parser.add_subparsers(dest="command", required=True)
@@ -143,6 +169,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="skip normalization and pass the text to the analyzer as typed",
     )
     analyze.add_argument("--json", action="store_true", help="print the Sentence as JSON")
+
+    irab = subcommands.add_parser("irab", help="the إعراب of one sentence")
+    irab.add_argument("text", help="the sentence, in Arabic")
+    irab.add_argument(
+        "--raw",
+        action="store_true",
+        help="skip normalization and pass the text to the analyzer as typed",
+    )
+    irab.add_argument("--json", action="store_true", help="print the Sentence as JSON")
     return parser
 
 
@@ -162,8 +197,37 @@ def _analyze(args: argparse.Namespace) -> int:
     return 0
 
 
+def _irab(args: argparse.Namespace) -> int:
+    if not args.text.strip():
+        print("nothing to analyze", flush=True)
+        return 2
+
+    from sibawayh.morphology import CamelMorphology
+    from sibawayh.parsers import attach
+    from sibawayh.parsers.catib import CatibParser
+
+    parser = CatibParser()
+    sentence = CamelMorphology().analyze(args.text, normalize_input=not args.raw)
+    tokens = enforce(
+        apply_rules(
+            insert_covert_pronouns(
+                normalize_arcs(attach(sentence.tokens, parser), parser.formalism)
+            )
+        )
+    )
+    analyzed = sentence.model_copy(update={"tokens": tokens})
+
+    if args.json:
+        print(analyzed.model_dump_json(indent=2))
+    else:
+        print(format_irab(analyzed))
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "analyze":
         return _analyze(args)
+    if args.command == "irab":
+        return _irab(args)
     raise AssertionError(f"unhandled command {args.command!r}")  # pragma: no cover

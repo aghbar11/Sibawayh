@@ -54,8 +54,9 @@ class Phrase:
     """A clause about the phrase or clause the token belongs to, said last."""
 
     states_inflection: bool = False
-    """True where `head` already contains مرفوع/منصوب/مجزوم, so no case clause
-    should be added after it."""
+    """True where `head` already names the inflection, so nothing may add it a
+    second time. The مضارع roles do — *فعل مضارع مرفوع* is one phrase — and so
+    does *اسم مجرور*, which would otherwise come out as اسم مجرور مجرور."""
 
 
 ROLE_PHRASE: dict[str, Phrase] = {
@@ -84,17 +85,20 @@ ROLE_PHRASE: dict[str, Phrase] = {
     "اسم إنّ": Phrase("اسم إنّ"),
     "خبر إنّ": Phrase("خبر إنّ"),
     # التوابع والمجرورات
-    "صفة": Phrase("صفة"),
+    "صفة": Phrase("نعت"),
     "مضاف إليه": Phrase("مضاف إليه"),
-    "مجرور": Phrase("اسم مجرور"),
+    "مجرور": Phrase("اسم مجرور", states_inflection=True),
     # الحروف
     "حرف جزم": Phrase("حرف جزم"),
     "حرف نصب": Phrase("حرف نصب"),
 }
 """Every role in `validate.ROLES`, and the words it contributes.
 
-`مجرور` is the one role whose head is not the role string: the role names a
-property, and the line has to name a thing — *اسم مجرور*, not *مجرور مجرور*.
+Two heads are not the role string. `مجرور` names a property where the line has
+to name a thing — *اسم مجرور*, not *مجرور مجرور*. And `صفة` is phrased as *نعت*,
+its equally standard name, because صفة is feminine and would need مرفوعة where
+every other role needs مرفوع; نعت is masculine and the agreement problem
+disappears rather than being handled.
 
 `فاعل — ضمير مستتر` gets the same head as a plain `فاعل`. What makes the line
 different is that the token is a covert pronoun, and that is on the token, not

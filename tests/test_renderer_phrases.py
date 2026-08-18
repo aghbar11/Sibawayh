@@ -104,6 +104,13 @@ def test_a_genitive_is_named_as_a_noun_not_as_a_property() -> None:
     assert phrase_for("مجرور").head == "اسم مجرور"
 
 
+def test_an_adjective_is_phrased_as_the_masculine_نعت() -> None:
+    """صفة is feminine and would need مرفوعة where every other role needs مرفوع.
+    نعت is the same term in the masculine, so the agreement problem disappears
+    instead of being handled."""
+    assert phrase_for("صفة").head == "نعت"
+
+
 def test_phrases_are_frozen() -> None:
     import dataclasses
 

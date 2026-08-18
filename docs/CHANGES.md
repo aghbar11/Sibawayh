@@ -81,6 +81,11 @@ Newest last.
 | 15 | `render.py` becomes a `renderers/` package, shaped like `parsers/` |
 | 15 | rendering is a component with **no** stage — `describe` returns lines, writes nothing |
 | 15 | a token the rules abstained on renders to `None`; a whitespace line is refused |
+| 15 | role phrasing, case naming, signs and المبني are four tables, one module each |
+| 15 | `صفة` is phrased نعت and `مجرور` اسم مجرور — agreement and repetition, respectively |
+| 15 | a مبني word's محل comes from the role alone, never from a read case or mood |
+| 15 | signs are named for two declension classes only; the rest stop after the case |
+| 15 | `python -m sibawayh irab` runs the whole pipeline and prints the إعراب |
 
 **Why the inventory is 25 and not 34.** The plan says every label must be in the 34-label set of
 the I3rab paper. Nine of those have no rule producing them — حال، تمييز، بدل، توكيد، عطف، مفعول
@@ -170,6 +175,66 @@ than as honest uncertainty, and abstention is only useful if it is legible as ab
 it, and only where it holds may a test compare against a fixed string or a caller cache a result.
 The cautious value is the default because the model-backed backend is the one that will be written
 without thinking about this.
+
+**The template renderer, and why it comes before the model.** إعراب prose is
+formulaic — the tradition teaches it as a formula precisely so a student can produce it
+mechanically — so the first backend builds every line from lookup tables and never calls anything:
+
+    الكِتابُ:      مبتدأ مرفوع وعلامة رفعه الضمة الظاهرة على آخره
+    العِراقِيِّينَ: اسم إنّ منصوب وعلامة نصبه الياء لأنه جمع مذكر سالم
+    في:            حرف جر مبني على السكون لا محل له من الإعراب، والجار والمجرور في محل رفع خبر
+
+It runs offline, costs nothing, and is identical every run, which is what lets all thirteen eval
+sentences be asserted against fixed strings. The prose a student reads now has a pass or a fail
+instead of being eyeballed. It is also what the model backend degrades *to*, which is the part the
+plan's "one retry then degrade" needed and did not have.
+
+**Four tables, one module each.** `phrases.py` turns a role into the words that open and close a
+line, `inflection.py` names the case, `signs.py` names the mark or letter carrying it, `built.py`
+handles words with no case at all. `template.py` puts them in order. The split is not decorative:
+each was written and measured on its own, and three of the four turned up something that would
+have been wrong if the whole thing had been written at once.
+
+**The em-dash in a compound role cannot be split on.** Five roles carry two claims, and the two
+halves relate differently in each: `حرف جر — خبر شبه جملة` names the word then its phrase, while
+`فاعل — ضمير مستتر` names the job then the word. A split would print ضمير مستتر where فاعل belongs.
+So the table is written out by hand, 25 entries, held to `validate.ROLES` in both directions.
+
+Two heads are deliberately not the role string. `مجرور` becomes *اسم مجرور* — the role names a
+property and a line has to name a thing — and it is marked as already stating its case, or the line
+reads اسم مجرور مجرور. `صفة` becomes *نعت*: صفة is feminine and would need مرفوعة where every other
+role needs مرفوع, and نعت is the same term in the masculine, so the agreement problem disappears
+rather than being handled.
+
+**The sign is not decided by the case.** العراقيين is منصوب and takes الياء, so a template printing
+الفتحة for every accusative would be confidently wrong about a word the eval set contains. Two
+declension classes are implemented because two are what the gold has: 38 of the 40 tokens decline
+with visible harakat and 2 are جمع مذكر سالم. المثنى، جمع المؤنث السالم، المقصور، المنقوص and
+الأسماء الخمسة return nothing, and the line stops after the case — `الكِتابانِ: مبتدأ مرفوع` is thin
+and true where `وعلامة رفعه الضمة` would be false.
+
+Recognising جمع مذكر سالم needs the lemma rather than the ending: مَساكين ends in ـين and is
+`num=p, gen=m` and is جمع تكسير. A sound plural is its own singular plus the suffix, and
+مَسْكين + ين is not مَساكين. And the alef of tanween is not a final alef — رائِعاً would otherwise
+look مقصور and lose its sign, which is a token of the eval set and not a hypothesis.
+
+**Three defects that only appeared on real input**, which is the argument for wiring the CLI in the
+same step rather than after:
+
+* A perfect verb came out as *كُتِبَت: فعل ماضٍ مبني للمجهول مبني على الفتح في محل رفع فعل ماضٍ مبني
+  للمجهول*. Live morphology reports a mood on perfect verbs — already recorded above under the
+  disambiguator — and the محل clause was taking it. A مبني word cannot show a case, so any case on
+  it belongs to the slot it occupies, and only a role that names a slot may supply one. The محل now
+  comes from the role alone.
+* `القَفَص` came out *اسم مجرور مجرور*, which is the `states_inflection` flag above.
+* The covert pronoun rendered as *ضمير مستتر تقديره هو\**. The asterisk is bookkeeping that says the
+  token was never typed, and it has no business in an Arabic line.
+
+**Two gaps left open, both above this layer.** يقرأ in محمد يقرأ الكتاب renders as *فعل مضارع* with
+no mood, because the role `خبر — جملة فعلية` claims the token for the nominal-predicate rule and
+that rule states nothing about the verb, while morphology reports `mood=unknown` as it does for
+every undiacritized مضارع. The renderer is right to stop; the mood is missing before it arrives.
+And إن still displays as أَنَّ, which is the open `form` defect recorded earlier.
 
 Two edits were made directly to `CLAUDE.md`, both requested: the `prc0` bullet now records that
 `d3tok` splits ال and that folding it back is the rule, and the conventions section now
