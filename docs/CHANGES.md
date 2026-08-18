@@ -78,6 +78,9 @@ Newest last.
 | 5 | `analyze` tokenizes twice, once as typed and once normalized, to keep the marks |
 | — | audit of this file: four stale measurements corrected, three formatting defects fixed |
 | 5 | **open defect** — `form` comes from the chosen analysis, so إن is shown back as أن |
+| 15 | `render.py` becomes a `renderers/` package, shaped like `parsers/` |
+| 15 | rendering is a component with **no** stage — `describe` returns lines, writes nothing |
+| 15 | a token the rules abstained on renders to `None`; a whitespace line is refused |
 
 **Why the inventory is 25 and not 34.** The plan says every label must be in the 34-label set of
 the I3rab paper. Nine of those have no rule producing them — حال، تمييز، بدل، توكيد، عطف، مفعول
@@ -138,6 +141,35 @@ match one. And CAMeL writes الدَرْسَ where the student writes الدَّ
 lam shamsiyya; that mismatch rejects every candidate, which is harmless only because rejecting
 everything leaves CAMeL's own ranking in place. Worth revisiting if a sentence turns up where it
 costs something.
+
+**Rendering is a component with no stage behind it.** Every other swappable piece of machinery in
+this project comes in two halves: the component returns a narrow result, and a thin stage function
+writes that result onto the tokens. `Parser.parse` returns head integers and `attach` puts them on
+`Token.head`. The renderer has only the first half. `describe` runs a backend, checks it returned
+one line per token, and hands the lines back to the caller.
+
+There is nowhere for them to go. `Token` sets `extra="forbid"`, so prose could only be stored by
+adding a field for it — and that is exactly the wrong thing to add. The renderer's entire
+restriction is that it describes the analysis and does not participate in it; giving it a field on
+the token it is describing hands it a way in. The restriction is currently enforced by the type
+system, since a backend can return nothing but strings, and a display-text field would replace that
+guarantee with a convention.
+
+This is a real departure from the convention in `CLAUDE.md`, which says a component's result is
+applied to the tokens by a stage. It is stated here rather than edited into the spec, because the
+spec's rule is right for every component that produces *analysis* — and rendering is the one that
+produces output.
+
+**Declining has its own spelling.** `Rendering.lines[i]` is `None` where the backend had nothing to
+say, which is what a token the rules abstained on gets. An empty string is refused outright: the
+UI would show a word with a blank إعراب beside it, which reads as a page that failed to load rather
+than as honest uncertainty, and abstention is only useful if it is legible as abstention.
+
+**Backends are generative unless they declare otherwise.** `Renderer.deterministic` defaults to
+`False`. Only a backend that depends on nothing but its tokens — no network, no sampling — may set
+it, and only where it holds may a test compare against a fixed string or a caller cache a result.
+The cautious value is the default because the model-backed backend is the one that will be written
+without thinking about this.
 
 Two edits were made directly to `CLAUDE.md`, both requested: the `prc0` bullet now records that
 `d3tok` splits ال and that folding it back is the rule, and the conventions section now

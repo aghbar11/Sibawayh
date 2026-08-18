@@ -14,7 +14,7 @@ MODULES = [
     "sibawayh.morphology",
     "sibawayh.normalize",
     "sibawayh.parsers",
-    "sibawayh.render",
+    "sibawayh.renderers",
     "sibawayh.rules",
     "sibawayh.schema",
 ]
