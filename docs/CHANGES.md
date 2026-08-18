@@ -74,6 +74,10 @@ Newest last.
 | 13 | "exactly one agent per verb" softened — two is always an error, zero only sometimes |
 | 13 | a downgrade keeps heads and evidence; only the role, its rule and its provenance go |
 | 13 | mood/role agreement not checked; the plan asks for case only |
+| 5 | `diacritics.py` added — the student's own vowelling picks among CAMeL's readings |
+| 5 | `analyze` tokenizes twice, once as typed and once normalized, to keep the marks |
+| — | audit of this file: four stale measurements corrected, three formatting defects fixed |
+| 5 | **open defect** — `form` comes from the chosen analysis, so إن is shown back as أن |
 
 **Why the inventory is 25 and not 34.** The plan says every label must be in the 34-label set of
 the I3rab paper. Nine of those have no rule producing them — حال، تمييز، بدل، توكيد، عطف، مفعول
@@ -95,10 +99,45 @@ somewhere to hang the words. `evidence` stays too: every item in it is an observ
 from it was thrown away.
 
 **What the validators cannot catch.** They find contradictions, not wrong answers. On real
-morphology `verbal_passive_01` still reads كتبت as active and passes every check, because an
-active reading of that sentence is internally coherent — the agent count works out, the cases
-agree, the tree is fine. Nothing here narrows the gap between 37 and 41; it only guarantees that
-what we do assert holds together.
+morphology `verbal_passive_01` read كتبت as active and passed every check, because an active
+reading of that sentence is internally coherent — the agent count works out, the cases agree, the
+tree is fine. Validation guarantees that what we assert holds together, nothing more.
+
+**Typed diacritics are now used, and they close that gap.** The analyzer dediacritizes its input
+before looking anything up, so كُتِبَتْ and كتبت produced byte-identical output and a student who
+vowelled their sentence got nothing for it. Measured directly, not assumed: three spellings of one
+sentence, one output.
+
+But the reading was in CAMeL's list all along — كُتِبَت (passive) scored 0.9283 against the chosen
+كَتَبَت (active) at 1.0. So `diacritics.py` does the comparison CAMeL will not, matching what was typed
+against each candidate's own `diac` and letting the matches outrank the rest. Nothing is invented;
+the analyses, the scores and the provenance are all still CAMeL's, and only the order changes.
+
+Partial vowelling is the normal case, so the test is compatibility rather than equality, position
+by position: where the student marked nothing there is no constraint, where the *candidate* marks
+nothing it is the vaguer of the two and cannot contradict, and where both marked it the student's
+mark must be among the candidate's. That last-but-one clause is what lets a typed final sukun
+match CAMeL's كُتِبَت, which has none. A vowelling matching nothing leaves the order untouched —
+we do not recognise it, and reordering on that basis would be a guess.
+
+On the eval set, with real recorded morphology, counting against the 40 gold roles:
+
+| input | right | wrong | abstained |
+|---|---|---|---|
+| as typed, bare | 36 | 2 | 2 |
+| fully vowelled | 39 | 0 | 1 |
+
+The one abstention left is محمد as a فاعل, and diacritics cannot reach it: CAMeL offers only two
+readings of محمد, `مُحَمَّد` and a bare backoff, neither carrying a case ending at all. That is
+`VERBAL_AGENT`'s `case=nom` requirement, still open.
+
+**Two traps found while building it, both by measurement.** An unvowelled candidate is CAMeL's
+backoff analysis, and being unvowelled it is compatible with everything — so it outranked the real
+readings and stripped الدرس of its features entirely. Only a candidate that states a vowelling can
+match one. And CAMeL writes الدَرْسَ where the student writes الدَّرْسَ, omitting the shadda of the
+lam shamsiyya; that mismatch rejects every candidate, which is harmless only because rejecting
+everything leaves CAMeL's own ranking in place. Worth revisiting if a sentence turns up where it
+costs something.
 
 Two edits were made directly to `CLAUDE.md`, both requested: the `prc0` bullet now records that
 `d3tok` splits ال and that folding it back is the rule, and the conventions section now
@@ -212,19 +251,38 @@ vowelled one. `form` is now the segment with marks stripped, `diac` is CAMeL's s
 written, and on a backoff analysis `diac` is `None` rather than echoing the bare surface as
 though it had been vowelled.
 
+`form` is still derived
+from the *chosen analysis* — `strip_diacritics(stem_diac)` — not from what the student typed. When
+CAMeL's winning reading spells the word differently, the difference survives the stripping, and
+the student gets a word back that they did not type. `nasikh_inna_01` is a live case: the student
+types **إن**, BERT's top reading is `أَنَّ`, and the token comes back as **أن** — the hamza has
+moved from under the alef to over it. The role assigned is correct (`حرف نصب`); only the surface
+is wrong.
+
+It is not cosmetic. The schema documents `form` as the word as typed and the UI is meant to show
+the student their own sentence, so this silently rewrites their input. It also means any
+evaluation matching produced tokens to gold by surface form scores this token as a miss on both
+sides. Not fixed here — the fix is to carry the typed word through and use it for `form`, which
+is the same plumbing the diacritics work just added, and it belongs in its own change.
+
 ### What the analyzer actually does to the eval set
 
 Not a deviation — a measurement, recorded because it makes steps 11–14 bigger than they look.
 
-| sentence | what CAMeL returns |
-|---|---|
-| `nasikh_inna_01` | إن ranks `pos=abbrev` first at 1.0; the `إِنَّ` reading (`verb_pseudo`) is 5th at 0.60 |
-| `verbal_passive_01` | active كَتَبَت wins; passive كُتِبَت is 3rd at 0.92 |
-| `nominal_single_predicate_01` | الشمس comes back `case=gen` |
-| `verbal_overt_agent_01` | الرجل comes back `case=acc` |
+> **Superseded.** Every row below was measured under MLE. The disambiguator is now BERT and the
+> fixture was re-recorded against it, so three of the four no longer hold. Kept because this table
+> is the evidence that motivated the switch; the current column is what is true today.
 
-MLE disambiguates each word out of context, so case on short sentences is often wrong and rank 1
-is not trustworthy. All four are recorded as tests.
+| sentence | under MLE (then) | under BERT (now) |
+|---|---|---|
+| `nasikh_inna_01` | إن ranks `pos=abbrev` first at 1.0; `إِنَّ` (`verb_pseudo`) is 5th at 0.60 | `conj_sub` readings take 1–3 at 1.0; `إِنَّ` is 4th at 0.9993 and `abbrev` last at 0.69 |
+| `verbal_passive_01` | active كَتَبَت wins; passive كُتِبَت is 3rd at 0.92 | active still wins at 1.0; passive is **2nd** at 0.9283 |
+| `nominal_single_predicate_01` | الشمس comes back `case=gen` | `case=nom` — **correct** |
+| `verbal_overt_agent_01` | الرجل comes back `case=acc` | `case=nom` — **correct** |
+
+MLE disambiguates each word out of context, so case on short sentences was often wrong and rank 1
+was not trustworthy. That is what the BERT switch fixed; both surviving rows are cases where the
+bare string really is ambiguous and no disambiguator can help.
 
 ---
 
@@ -319,7 +377,7 @@ are traditional-grammar-shaped:
 
 ### What this does not change
 
-**The rule engine is unaffected in scope.
+**The rule engine is unaffected in scope.**
 
 | CATiB | i'rab roles it collapses | discriminator |
 |---|---|---|
@@ -471,9 +529,10 @@ Three things fall out that are worth keeping:
   governs. Tier 2 may separate them. Recorded now so a later failure is recognised rather than
   debugged from scratch.
 
-  Why did we use re-rooting?
-  Because the CATiB heads were checked against the eval set, and the eval set is checked against the gold. The gold is what the rule engine
-  expects. They prove that the code for choosing the heads is correct.
+**Why re-rooting is trusted.** The CATiB heads were checked against the eval set, and the eval
+set was checked by hand against the gold analysis. Gold is what the rule engine expects, so
+agreement across all thirteen sentences is evidence that the head selection is right — not just
+that it is self-consistent.
 
 
 ### `parser_label` outlives the arc it described
@@ -483,7 +542,6 @@ longer exists: in كتاب الطالب جديد, كتاب keeps `SBJ` while bec
 anyway and the schema now says why — it stays useful *evidence* (`SBJ` argues for فاعل or مبتدأ
 however the tree was re-hung) and it is the strongest signal the parser hands the rule engine.
 Read as a property of the token, never as the name of an edge.
-/
 ### Coordination, now with a concrete failure mode
 
 Still a known gap, as planned, but the guidelines make the symptom specific: a sentence-initial و
@@ -508,10 +566,13 @@ Two signals are used, and **either** is enough to block insertion:
   passive"*
 * `case == nom` — the morphological signal
 
-The redundancy is the point. Step 5 already recorded that CAMeL reads الرجل in
-`verbal_overt_agent_01` as **accusative**; on case alone that sentence would gain a ضمير مستتر
-next to a subject the student can plainly see. The parser's `SBJ` catches it. A parser mislabel is
-caught the other way round.
+The redundancy is the point. Step 5 recorded that CAMeL read الرجل in `verbal_overt_agent_01` as
+**accusative**; on case alone that sentence would gain a ضمير مستتر next to a subject the student
+can plainly see. The parser's `SBJ` catches it. A parser mislabel is caught the other way round.
+
+*(BERT now reads الرجل as nominative, so that particular example no longer fires. The redundancy
+stays: `verbal_passive_01` immediately below is the same failure under a different word, and it
+still happens.)*
 
 **A dependent whose case is `unknown` also blocks insertion.** That is the abstaining direction
 CLAUDE.md asks for: an unreadable case might be the agent, and asserting a covert pronoun where
@@ -520,6 +581,11 @@ the right trade for a teaching tool.
 
 **Passive needs no special case.** نائب فاعل is nominative, so it registers as a candidate through
 the same test — `verbal_passive_01` is skipped without the stage ever looking at `voice`.
+
+*(True on gold morphology, which is what that claim was measured against. On real bare input BERT
+reads المقالة as accusative, so it is not a candidate, and the stage inserts a هي* that does not
+belong. Typed diacritics fix it by making المقالة nominative again. The mechanism is right; it
+inherits whatever the morphology layer got wrong.)*
 
 ### `pos` is `pron`, not `S-`
 
@@ -765,6 +831,13 @@ on the eval set's gold features told a different story:
 | MLE — what a live demo uses | 8 | **6** | 27 | 41 |
 | **BERT** | **29** | **4** | 8 | 41 |
 
+**On the denominators, since they differ.** The gold row counts the 40 tokens in
+`data/eval/sentences.json`. The other two count *produced* tokens, and there are 41 because on
+real morphology `verbal_passive_01` gains a covert pronoun that does not belong. Comparing 40 to
+41 is comparing two different populations. Everything measured after this section uses one scheme
+and states it: walk the 40 gold tokens, match each to the produced token with the same surface
+form, and report spurious produced tokens separately instead of folding them in.
+
 The gold row is what every test in the suite measures, and it is honest about the *rules*. It says
 nothing about what a student typing a sentence would see, which is the middle row: wrong about one
 word in seven, silent about two in three. The problem was that the disambiguator was MLE, which disambiguates each word in isolation and cannot see the verb
@@ -868,12 +941,22 @@ shape as the priority-tie bug — gold-shaped inputs are not analyser-shaped one
 governed by an *attached* لام with no separate particle token at all. That case is untested — no
 tier-1 sentence has one.
 
-The fourth verb, in `nominal_verbal_predicate_01`, was never a mood problem: it is a خبر and fails
-for a separate reason, still undiagnosed.
+The fourth verb, in `nominal_verbal_predicate_01`, was never a mood problem: it is a خبر, and
+naming it خبر — جملة فعلية rather than فعل مضارع مرفوع is what gold asks for. It was recorded here
+as failing for an undiagnosed reason; re-measured, the sentence comes out complete and correct on
+real morphology, bare or vowelled. Nothing was fixed deliberately — the مبتدأ work below is what
+unblocked it, since the خبر rules ask whether their head is the مبتدأ.
 
 ### Position stands in for an unreadable case at the root
 
-**37 correct, 3 wrong, 1 abstained** of 41 on real morphology, from 34/4/3.
+**37 correct, 3 wrong, 1 abstained** of 41 produced tokens on real morphology, from 34/4/3.
+(Under the gold-token scheme adopted above, the same run is 36 right, 2 wrong, 2 abstained of 40,
+plus one spurious pronoun and one form mismatch. Same measurement, stated two ways.)
+
+All of these are **bare, undiacritized input** — the sentences as the eval set writes them. That
+is still what bare input scores today; nothing since has changed this path. The 39 right / 0 wrong
+recorded in the typed-diacritics entry is the same thirteen sentences with the vowels supplied,
+which is a different input rather than a later improvement to this one.
 
 `TOPIC` required `case is NOM`. Bare proper nouns break that: محمدٌ / محمدًا / محمدٍ are spelled
 identically, so محمد comes back `unknown` — and it took its whole clause with it, because the خبر
@@ -959,7 +1042,8 @@ that information exists only in annotated sentences. Which is why they land in d
 | asset | licence | ships commercially? |
 |---|---|---|
 | `morphology-db-msa-r13` (installed) | GPL v2 | yes, with GPL obligations |
-| `disambig-mle-calima-msa-r13` (installed) | GPL v2 | yes, with GPL obligations |
+| `disambig-bert-unfactored-msa` (**what we ship**) | MIT weights, over the GPL v2 database | yes, with the database's GPL obligations |
+| `disambig-mle-calima-msa-r13` (installed, fallback) | GPL v2 | yes, with GPL obligations |
 | `camelbert-catib-parser` (step 8) | MIT weights, trained on CamelTB + PATB | probably — see step 8 |
 | CamelTB (not obtained) | open | yes |
 | `morphology-db-msa-s31` (**not** installed) | LDC restricted | no |

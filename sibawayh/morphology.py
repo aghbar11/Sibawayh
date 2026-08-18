@@ -41,6 +41,7 @@ import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from sibawayh.diacritics import rank as rank_by_diacritics
 from sibawayh.normalize import normalize, strip_diacritics
 from sibawayh.schema import (
     Analysis,
@@ -442,6 +443,7 @@ def tokens_from_word(
     word: str,
     analyses: Sequence[tuple[Mapping[str, Any], float | None]],
     start_id: int = 1,
+    typed: str | None = None,
 ) -> list[Token]:
     """Turn one disambiguated word into one or more tokens.
 
@@ -449,11 +451,19 @@ def tokens_from_word(
     first is promoted onto the stem token and the rest become its `alternatives`.
     Clitics are split off as their own tokens, `ال` excepted.
 
+    `typed` is the word as the student actually spelled it, diacritics and all.
+    When it carries marks, the analyses are reordered so the readings compatible
+    with them come first — see `diacritics.py`. This has to happen before
+    anything else here, because segmentation reads the top analysis.
+
     Ids run from `start_id` in surface order: proclitics, stem, enclitics.
     `head` is left `None` — attachment is the parser's job.
     """
     if not analyses:
         raise MorphologyError(f"word {word!r} has no analyses")
+
+    ranking = rank_by_diacritics(typed or "", [str(a.get("diac") or "") for a, _ in analyses])
+    analyses = [analyses[index] for index in ranking.order]
 
     top, _ = analyses[0]
     proclitics, stem_diac, enclitics = _segment(word, top)
@@ -487,6 +497,10 @@ def tokens_from_word(
         # live here. CAMeL scores them relative to the winner, so the first
         # alternative's score *is* the margin the abstention layer needs.
         alternatives=[translate_analysis(analysis, score) for analysis, score in analyses[1:]],
+        # Recorded only when the typed vowelling actually ruled something out.
+        # `provenance` still says the features are CAMeL's, which is true — we
+        # chose among CAMeL's own readings rather than inventing one.
+        evidence=["typed_diacritics_chose_this_reading"] if ranking.decided else [],
     )
     tokens.append(stem)
 
@@ -501,14 +515,29 @@ def sentence_from_analyses(
     text: str,
     words: Sequence[tuple[str, Sequence[tuple[Mapping[str, Any], float | None]]]],
     sentence_id: str | None = None,
+    typed: Sequence[str] | None = None,
 ) -> Sentence:
     """Assemble a `Sentence` from (surface word, ranked analyses) pairs.
 
+    `typed`, if given, is the same words as the student spelled them, one for
+    one and in the same order — the diacritics normalization stripped before the
+    analyzer ever saw them.
+
     Pure: this is the seam the tests drive with recorded CAMeL output.
     """
+    if typed is not None and len(typed) != len(words):
+        raise MorphologyError(f"{len(typed)} typed words for {len(words)} analyzed ones")
+
     tokens: list[Token] = []
-    for word, analyses in words:
-        tokens.extend(tokens_from_word(word, analyses, start_id=len(tokens) + 1))
+    for index, (word, analyses) in enumerate(words):
+        tokens.extend(
+            tokens_from_word(
+                word,
+                analyses,
+                start_id=len(tokens) + 1,
+                typed=None if typed is None else typed[index],
+            )
+        )
     return Sentence(id=sentence_id, sentence=text, tokens=tokens)
 
 
@@ -594,9 +623,18 @@ class CamelMorphology:
 
         `Sentence.sentence` holds the normalized text, since that is what the
         token forms correspond to. Heads and i'rab roles are untouched.
+
+        The words are tokenized twice: once as typed and once after
+        normalization. The analyzer only ever sees the second — it dediacritizes
+        its input anyway — while the first is kept so `tokens_from_word` can use
+        the student's own vowelling to choose among the readings that come back.
+        If the two tokenizations disagree on how many words there are, they
+        cannot be lined up, and the typed forms are dropped rather than guessed
+        at.
         """
         from camel_tools.tokenizers.word import simple_word_tokenize
 
+        typed = simple_word_tokenize(text)
         if normalize_input:
             text = normalize(text)
         words = simple_word_tokenize(text)
@@ -604,7 +642,12 @@ class CamelMorphology:
             (word.word, [(scored.analysis, scored.score) for scored in word.analyses])
             for word in self.disambiguator.disambiguate(words)
         ]
-        return sentence_from_analyses(text, ranked, sentence_id=sentence_id)
+        return sentence_from_analyses(
+            text,
+            ranked,
+            sentence_id=sentence_id,
+            typed=typed if len(typed) == len(ranked) else None,
+        )
 
 
 def analyze(text: str, top: int = DEFAULT_TOP, kind: str | None = None, **kwargs: Any) -> Sentence:
