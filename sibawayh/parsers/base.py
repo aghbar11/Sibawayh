@@ -49,7 +49,7 @@ class Formalism(StrEnum):
     CATIB = "catib"
     UD = "ud"
     PADT = "padt"
-    """Prague analytical functions — step 22's evaluation-only backend."""
+    """Prague analytical functions — the evaluation-only backend."""
 
     SIBAWAYH = "sibawayh"
     """Not a backend's answer but the target: what arc normalization produces.

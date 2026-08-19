@@ -135,7 +135,7 @@ def test_eval_only_is_declarable() -> None:
 def test_formalism_must_be_declared() -> None:
     """Unlike `eval_only`, this has no safe default — so it is refused outright.
 
-    A missing declaration would surface as wrongly normalized arcs in step 9,
+    A missing declaration would surface as wrongly normalized arcs in arc normalization,
     which reads as a parsing bug. Failing at class definition keeps the error
     where the omission is.
     """

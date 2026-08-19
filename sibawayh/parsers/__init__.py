@@ -12,7 +12,7 @@ bookkeeping happens, so backends cannot drift in how they do it.
 
     tokens = attach(tokens, parser)
 
-No backend exists yet. The CATiB backend lands with step 8, `PadtParser` with the
+No backend exists yet. The CATiB backend lands with the parser backend, `PadtParser` with the
 evaluation work, and the env-var gate that reads `Parser.eval_only` comes with
 the latter.
 """
