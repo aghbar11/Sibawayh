@@ -25,3 +25,6 @@ dist/
 .DS_Store
 
 CLAUDE.md
+
+# parser training work — kept local, not part of the repo
+notebooks/
