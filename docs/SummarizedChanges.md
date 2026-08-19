@@ -51,7 +51,7 @@ or *you wrote*. The analyzer returns all four and has no opinion about which was
 
 ### 3. Choosing which reading was meant
 
-Something has to pick. The project uses a language model that reads the **whole sentence** and
+Something has to pick. The project uses a language model, CAMeLBERT, that reads the **whole sentence** and
 describes what belongs in each slot — *past tense, passive, third person, feminine* — and then
 each candidate reading is scored by how many of its fourteen features match that description.
 Highest count wins.
@@ -59,13 +59,13 @@ Highest count wins.
 The reason it works is context. In **الرسالةُ كتبت** the word before the verb is *the letter*,
 and a letter does not write — it gets written. That neighbour is the evidence.
 
-An older, simpler method picked whichever reading was commonest for that word on its own. Every
-case error measured against the test set came from that method, and none survived the switch.
+An older, simpler method, MLE (Maximum Likelihood Estimation) which was replaced by CAMeLBERT, picked whichever reading was commonest for that word on its own. Every
+case error measured against the test set came from that method, and none survived the switch. 
 
 **Two things this cannot do**, and both matter later:
 
 - It **compares**; it never invents. If none of the dictionary's readings state a word's case,
-  the winner will not state one either.
+  the winner will not state one either. 
 - When two readings match equally well, it genuinely cannot separate them.
 
 The second gap is closed by using the student's own typing. If they wrote مُحَمَّدٌ with the vowel
@@ -79,12 +79,23 @@ Grammar is not a flat list. In قرأ محمد الكتاب, both محمد and �
 as the doer, one as the thing done. That structure is a **tree**, and working it out is called
 parsing.
 
-The project uses a trained parser and takes **only the tree shape** from it — which word attaches
-to which — and throws away the parser's own names for the relationships. Those names come from a
-different grammatical tradition and would only be confusing if mixed in.
+The project uses a trained parser and takes only the tree structure (HEADS) from it — which word attaches to which — and throws away the parser's own dependency labels. 
+Those labels come from a particular dependency formalism (or annotation scheme) and would only be confusing if mixed in.
+We are currently using the CATiB parser, which is trained on a treebank annotated according to the CATiB dependency formalism, matching the representation expected by the Iʿrāb rules.
 
-One adjustment is needed. The parser hangs the sentence from its verb; إعراب hangs it from the
-first word. That conversion is arithmetic on the tree, nothing more.
+A different parser, trained on a treebank using a different dependency formalism, would produce a different dependency structure — for example,
+ Universal Dependencies (UD) — and would not be directly compatible with the rules that follow.
+
+One adjustment is needed. The parser hangs the sentence from its verb; Irab hangs it from the
+first word. That conversion is arithmetic on the tree, so we perform arc normalization so that the tree
+behaves similar to Irab structure.
+
+Arc normalization is a process that adjusts the tree structure produced by the parser to match the expected structure for Iʿrāb analysis. 
+This involves re-rooting the tree and ensuring that the relationships between words are consistent with traditional Arabic grammar conventions.
+
+The reference for this "re-rooting" is the 13 Tier 1 eval sentences that were written by hand and checked for correctness.
+
+More eval sentences and more rules will be added.
 
 ### 5. Adding words that were never written
 
@@ -97,16 +108,17 @@ marks them as inserted so they can be excluded from any comparison against refer
 
 ### 6. Naming the roles
 
-Now the actual إعراب. A set of hand-written rules looks at each word — its features, its position,
-what governs it, which word governs it — and names its role: فاعل، مفعول به، مبتدأ، خبر، مضاف إليه،
-نعت, and so on.
+Now the actual Irab. A set of hand-written rules looks at each word — its features, its position,
+what governs it, which word governs it — and names its role: فاعل، مفعول به، مبتدأ، خبر، مضاف إليه，
+نعت, and so on. This is how Irab works. You see the sign of the word, the type (verb, noun, etc.), and its tree.
+We already have all of these components, so we hard-code Irab rules as they are.
 
 Two things make this layer trustworthy:
 
 **Every rule records why it fired.** Not a paragraph — a list of observations, like
 `case=nom`, `head_is_verb`, `immediately_follows_particle`. That list is kept on the word. It
 turns out to be the single most useful thing in the project, because it is later reused as
-teaching material.
+teaching material. This will help the LLM model to give the ground-truth reasoning behind its answer, not a bunch of hallucinations.
 
 **A rule that cannot be sure says nothing.** If the analyzer could not determine a word's case, or
 two readings were nearly tied, or no rule matched, the word is left unlabelled and the page says
@@ -127,7 +139,8 @@ traced to the layer that caused it.
 
 Wrong إعراب delivered confidently is the failure that would kill the product. Every layer is built
 to refuse rather than fill in a gap. On the test sentences, fully vowelled, the current result is
-39 roles right, 0 wrong, 1 abstained.
+39 roles right, 0 wrong, 1 abstained. Here, we ask the LLM model to suggest an answer, but we ask the student
+to ask their teacher.
 
 That one abstention is محمد, and it is instructive: the dictionary holds exactly one reading of
 محمد, and that reading states no case. Adding vowel marks cannot help, because there is no second
@@ -150,7 +163,7 @@ everything else falls back to it.
 
 ### The fluent half
 
-A language model (Gemini) rewrites those lines as friendlier prose. It is handed the **finished
+A language model (Gemini), for now, rewrites those lines as friendlier prose. It is handed the **finished
 answer** and asked only to say it well. It cannot change the analysis, because it is never asked
 for one.
 
@@ -224,7 +237,7 @@ role, is never scored, and is only ever asked for about words the rules declined
 
 ---
 
-## What is still open
+## What is still open, We leave for the near future.
 
 - **Proper names abstain** on case, for the dictionary reason above. Fixing it means reading the
   case off the ending the student typed, which is deriving a fact rather than choosing among
